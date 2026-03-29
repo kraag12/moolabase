@@ -1,0 +1,72 @@
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kamog\Downloads\moolabase\.next\dev\server\app\api\notifications\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kamog\\Downloads\\moolabase\\.next\\dev\\server\\app\\api\\notifications\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+
+thread 'tokio-runtime-worker' (304) panicked at C:\actions-runner\_work\next.js\next.js\turbopack\crates\turbo-tasks-backend\src\backend\mod.rs:963:22:
+Failed to lookup task type: Looking up task type for TaskId 140729 from database failed
+
+Caused by:
+    0: Unable to open static sorted file referenced from 00000309.meta
+    1: Unable to open static sorted file 00000304.sst
+    2: The system cannot find the file specified. (os error 2)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'tokio-runtime-worker' (10212) panicked at C:\actions-runner\_work\next.js\next.js\turbopack\crates\turbo-tasks-backend\src\backend\mod.rs:963:22:
+Failed to lookup task type: Looking up task type for TaskId 138777 from database failed
+
+Caused by:
+    0: Unable to open static sorted file referenced from 00000309.meta
+    1: Unable to open static sorted file 00000304.sst
+    2: The system cannot find the file specified. (os error 2)
+
+thread 'tokio-runtime-worker' (304) panicked at C:\actions-runner\_work\next.js\next.js\turbopack\crates\turbo-tasks-backend\src\backend\operation\mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Meta for item_code_and_ids (TaskId 146574))
+
+Caused by:
+    0: Looking up data for TaskId 146574 from database failed
+    1: Unable to open static sorted file referenced from 00000315.meta
+    2: Unable to open static sorted file 00000310.sst
+    3: The system cannot find the file specified. (os error 2)
+
+thread 'tokio-runtime-worker' (304) panicked at C:\actions-runner\_work\next.js\next.js\turbopack\crates\turbo-tasks-backend\src\backend\operation\mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Meta for item_code_and_ids (TaskId 146574))
+
+Caused by:
+    0: Looking up data for TaskId 146574 from database failed
+    1: Unable to open static sorted file referenced from 00000315.meta
+    2: Unable to open static sorted file 00000310.sst
+    3: The system cannot find the file specified. (os error 2)
+
+thread 'tokio-runtime-worker' (304) panicked at C:\actions-runner\_work\next.js\next.js\turbopack\crates\turbo-tasks-backend\src\backend\operation\mod.rs:156:17:
+Failed to restore task data (corrupted database or bug): Data for item_code_and_ids (TaskId 146574))
+
+Caused by:
+    0: Looking up data for TaskId 146574 from database failed
+    1: Unable to open static sorted file referenced from 00000314.meta
+    2: Unable to open static sorted file 00000311.sst
+    3: The system cannot find the file specified. (os error 2)
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kamog\Downloads\moolabase\.next\dev\server\app\api\listings\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kamog\\Downloads\\moolabase\\.next\\dev\\server\\app\\api\\listings\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kamog\Downloads\moolabase\.next\dev\server\app\api\notifications\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kamog\\Downloads\\moolabase\\.next\\dev\\server\\app\\api\\notifications\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}
+⨯ Error: ENOENT: no such file or directory, open 'C:\Users\kamog\Downloads\moolabase\.next\dev\server\app\api\notifications\[__metadata_id__]\route\app-paths-manifest.json'
+    at ignore-listed frames {
+  errno: -4058,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: 'C:\\Users\\kamog\\Downloads\\moolabase\\.next\\dev\\server\\app\\api\\notifications\\[__metadata_id__]\\route\\app-paths-manifest.json'
+}

@@ -1,9 +1,15 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { Search, MapPin, RefreshCw } from 'lucide-react'
+import Image from 'next/image'
+import { Search, MapPin, RefreshCw, AlertTriangle } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
+import HeaderAuthActions from './components/HeaderAuthActions'
+import { fetchListingsClient } from '@/lib/listings/fetchListingsClient'
+import { getListingHref } from '@/lib/listings/url'
+import { isAbortError } from '@/lib/errors/isAbortError'
+import { ABORT_REASON } from '@/lib/abort-reason'
 
 type Listing = {
   id: string | number
@@ -14,6 +20,14 @@ type Listing = {
   poster_avatar_url?: string | null
   type: 'job' | 'service'
   created_at: string
+  response_time?: string
+}
+
+type ListingsApiErrorDetails = {
+  status: number | null
+  statusText: string | null
+  url: string
+  details?: unknown
 }
 
 export default function HomePage() {
@@ -22,6 +36,10 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const isMountedRef = useRef(true)
+  const fetchInFlightRef = useRef(false)
+  const lastBackgroundRefreshRef = useRef(0)
+  const fetchControllerRef = useRef<AbortController | null>(null)
 
   const formatTimeAgo = (dateString: string) => {
     const posted = new Date(dateString)
@@ -44,70 +62,146 @@ export default function HomePage() {
   }
 
   const fetchListings = useCallback(async (showLoading = true) => {
+    if (fetchInFlightRef.current) return
+    fetchInFlightRef.current = true
+    fetchControllerRef.current?.abort(ABORT_REASON)
+    const controller = new AbortController()
+    fetchControllerRef.current = controller
+
     try {
-      if (showLoading) setLoading(true)
-      const res = await fetch('/api/listings')
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        console.error('Listings API error:', data)
-        setLoading(false)
+      if (showLoading && isMountedRef.current) setLoading(true)
+      const res = await fetch('/api/listings', { cache: 'no-store', signal: controller.signal })
+
+      if (res.status === 304) {
         return
       }
 
-      const data = await res.json()
+      if (!res.ok) {
+        const raw = await res.text().catch(() => '')
+        let data: Record<string, unknown> = {}
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw)
+            data = parsed && typeof parsed === 'object' ? parsed : { raw: String(parsed) }
+          } catch {
+            data = { raw }
+          }
+        }
+        const errorDetails: ListingsApiErrorDetails = {
+          status: Number.isFinite(res.status) ? res.status : null,
+          statusText: res.statusText || null,
+          url: res.url || '/api/listings',
+          ...data,
+        }
+        const detailsMessage =
+          typeof errorDetails.details === 'string'
+            ? errorDetails.details.toLowerCase()
+            : ''
+        const isTransientFetchFailure = detailsMessage.includes('fetch failed')
+        if (res.status !== 404) {
+          if (isTransientFetchFailure) {
+            console.warn('Listings API transient error, using client fallback.')
+          } else {
+            console.error('Listings API error:', JSON.stringify(errorDetails))
+          }
+        }
+        try {
+          const fallbackListings = await fetchListingsClient(supabase)
+          if (isMountedRef.current) {
+            setListings(fallbackListings.slice(0, 5))
+            setFilteredListings(fallbackListings.slice(0, 5))
+          }
+        } catch (fallbackError) {
+          if (!isAbortError(fallbackError)) {
+            console.error('Listings fallback error:', fallbackError)
+          }
+        }
+        return
+      }
+
+      const data = await res.json().catch(() => ({}))
       const merged = data?.listings ?? []
-      setListings(merged.slice(0, 5))
-      setFilteredListings(merged.slice(0, 5))
+      if (isMountedRef.current) {
+        setListings(merged.slice(0, 5))
+        setFilteredListings(merged.slice(0, 5))
+      }
     } catch (err) {
-      console.error('Fetch listings error:', err)
+      // ignore abort errors triggered by navigation/unmount
+      if (!isAbortError(err)) {
+        console.error('Fetch listings error:', err)
+      }
     } finally {
-      setLoading(false)
+      fetchInFlightRef.current = false
+      if (isMountedRef.current) {
+        setLoading(false)
+      }
     }
   }, [])
 
-  useEffect(() => {
-    async function initListings() {
-      await fetchListings()
+  const fetchListingsFromBackground = useCallback(() => {
+    const now = Date.now()
+    if (now - lastBackgroundRefreshRef.current < 3000) return
+    lastBackgroundRefreshRef.current = now
+    if (isMountedRef.current) {
+      void fetchListings(false).catch((err) => {
+        if (!isAbortError(err)) console.error('Background listings fetch failed:', err)
+      })
+    }
+  }, [fetchListings])
 
-      // Try to set up realtime subscriptions (best-effort)
+  useEffect(() => {
+    let jobsSubscription: ReturnType<typeof supabase.channel> | null = null
+    let servicesSubscription: ReturnType<typeof supabase.channel> | null = null
+    let cancelled = false
+    isMountedRef.current = true
+
+    ;(async () => {
+      await fetchListings()
+      if (cancelled) return
+
       try {
-        const jobsSubscription = supabase
+        jobsSubscription = supabase
           .channel('jobs-home')
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'jobs' },
             () => {
-              fetchListings(false)
+              fetchListingsFromBackground()
             }
           )
           .subscribe()
 
-        const servicesSubscription = supabase
+        servicesSubscription = supabase
           .channel('services-home')
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'services' },
             () => {
-              fetchListings(false)
+              fetchListingsFromBackground()
             }
           )
           .subscribe()
-
-        return () => {
-          try {
-            jobsSubscription.unsubscribe()
-            servicesSubscription.unsubscribe()
-          } catch {}
-        }
       } catch (e) {
-        // Realtime disabled — continue using server fetch
-        // eslint-disable-next-line no-console
+        // Realtime disabled, polling/manual refresh still works.
         console.warn('Realtime disabled for home listings:', e)
       }
-    }
+    })()
 
-    initListings()
-  }, [fetchListings])
+    const interval = setInterval(() => {
+      fetchListingsFromBackground()
+    }, 20000)
+
+    return () => {
+      cancelled = true
+      isMountedRef.current = false
+      clearInterval(interval)
+      fetchControllerRef.current?.abort(ABORT_REASON)
+      try {
+        jobsSubscription?.unsubscribe()
+        servicesSubscription?.unsubscribe()
+      } catch {}
+    }
+  }, [fetchListings, fetchListingsFromBackground])
 
   useEffect(() => {
     const query = searchQuery.toLowerCase()
@@ -122,7 +216,7 @@ export default function HomePage() {
   const handleRefresh = async () => {
     setRefreshing(true)
     await fetchListings(false)
-    setRefreshing(false)
+    if (isMountedRef.current) setRefreshing(false)
   }
 
   return (
@@ -132,20 +226,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
           <div className="flex justify-between items-center">
             <h1 className="text-2xl sm:text-4xl font-bold tracking-tight">MOOLABASE</h1>
-            <div className="flex gap-2 sm:gap-3">
-              <Link
-                href="/signup"
-                className="px-3 sm:px-4 py-2 border border-black rounded-md hover:bg-neutral-50 transition font-medium text-sm sm:text-base"
-              >
-                Sign Up
-              </Link>
-              <Link
-                href="/login"
-                className="px-3 sm:px-4 py-2 bg-black text-white rounded-md hover:bg-neutral-800 transition font-medium text-sm sm:text-base"
-              >
-                Log In
-              </Link>
-            </div>
+            <HeaderAuthActions />
           </div>
         </div>
       </header>
@@ -165,7 +246,7 @@ export default function HomePage() {
           </Link>
 
           <Link
-            href="/post/jobs/service"
+            href="/post/services"
             className="w-full sm:w-80 border border-black py-3 rounded-lg font-semibold hover:bg-black hover:text-white transition bg-white"
           >
             Offer a Service
@@ -218,24 +299,41 @@ export default function HomePage() {
 
         <div className="flex flex-col gap-4">
           {filteredListings.map((listing) => {
-            const href = listing.type === 'service' ? `/post/jobs/service/${listing.id}` : `/post/jobs/${listing.id}`
+            // ensure we have an id and type before linking
+            if (!listing.id) return null
+            const idStr = String(listing.id).trim()
+            if (!idStr) {
+              return null
+            }
+            // navigate to the public detail page for the listing
+            const href = getListingHref(idStr, listing.type)
 
             return (
-              <Link key={`${listing.type}-${String(listing.id)}`} href={href} className="block">
-                <div className="bg-gradient-to-br from-white to-neutral-50 border border-neutral-200 rounded-xl p-5 sm:p-6 shadow-sm hover:shadow-xl hover:border-neutral-300 transition cursor-pointer w-full max-w-2xl mx-auto">
+              <Link key={`${listing.type}-${idStr}`} href={href} className="block">
+                <div className="bg-linear-to-br from-white to-neutral-50 border border-neutral-200 rounded-xl p-5 sm:p-6 shadow-sm hover:shadow-xl hover:border-neutral-300 transition cursor-pointer w-full max-w-2xl mx-auto">
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="flex items-start gap-3">
                       <div className="h-10 w-10 rounded-full bg-neutral-100 border border-neutral-200 overflow-hidden shrink-0">
-                        <img
+                        <Image
                           src={listing.poster_avatar_url || '/avatar-placeholder.svg'}
                           alt={listing.poster_username || 'Profile'}
+                          width={40}
+                          height={40}
                           className="h-full w-full object-cover"
                         />
                       </div>
                       <div>
-                        <h3 className="text-lg sm:text-xl font-extrabold text-neutral-900 tracking-tight line-clamp-2">
-                          {listing.title}
-                        </h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg sm:text-xl font-extrabold text-neutral-900 tracking-tight line-clamp-2">
+                            {listing.title}
+                          </h3>
+                          {listing.type === 'job' && listing.response_time === 'urgent' && (
+                            <div className="flex items-center gap-1 text-red-600 bg-red-100 border border-red-200 px-2 py-0.5 rounded-full">
+                              <AlertTriangle size={12} />
+                              <span className="text-xs font-semibold">URGENT</span>
+                            </div>
+                          )}
+                        </div>
                         <p className="text-xs text-neutral-500">
                           @{listing.poster_username || 'member'}
                         </p>
@@ -246,7 +344,8 @@ export default function HomePage() {
                     </span>
                   </div>
                   <p className="text-sm text-neutral-800 mb-1">
-                    Offer: {listing.offer !== null && listing.offer !== undefined ? `R ${Number(listing.offer).toLocaleString()}` : 'Not specified'}
+                    {listing.type === 'service' ? 'Rate' : 'Offer'}:{' '}
+                    {listing.offer !== null && listing.offer !== undefined ? `R ${Number(listing.offer).toLocaleString()}` : 'Not specified'}
                   </p>
                   <div className="flex items-center gap-2 text-sm text-neutral-600 mb-2">
                     <MapPin size={14} className="text-neutral-500" />
@@ -274,68 +373,18 @@ export default function HomePage() {
         )}
       </section>
 
-      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6">
-        <div className="mt-12 border-t border-neutral-200"></div>
-      </div>
-
-      {/* Info Section */}
-      <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 pt-10 pb-10 sm:pt-12 sm:pb-12">
-        <div className="max-w-3xl mx-auto space-y-4">
-          <details className="bg-white border border-neutral-200 rounded-xl p-5">
-            <summary className="cursor-pointer text-lg font-semibold text-neutral-900">About</summary>
-            <p className="text-sm text-neutral-700 leading-relaxed whitespace-pre-wrap mt-3">
-              Moolabase is a free community-driven platform that connects people who need jobs done with individuals offering local or remote services.
-
-              Users can post jobs, offer services, apply to opportunities, and connect directly, without fees, middlemen, or commissions.
-
-              The goal is simple: make it easier for people to find work and get things done.
-            </p>
-          </details>
-          <details className="bg-white border border-neutral-200 rounded-xl p-5">
-            <summary className="cursor-pointer text-lg font-semibold text-neutral-900">Contact</summary>
-            <p className="text-sm text-neutral-700 leading-relaxed whitespace-pre-wrap mt-3">
-              For questions, support, or general enquiries, contact us at:
-
-              moolabaseorg@gmail.com
-            </p>
-          </details>
-          <details className="bg-white border border-neutral-200 rounded-xl p-5">
-            <summary className="cursor-pointer text-lg font-semibold text-neutral-900">Privacy Policy</summary>
-            <p className="text-sm text-neutral-700 leading-relaxed whitespace-pre-wrap mt-3">
-              Moolabase respects your privacy.
-
-              We only collect information necessary to operate the platform, such as profile details, job listings, service listings, and messages between users.
-
-              We do not sell personal data to third parties. Uploaded content and profile information are visible only as required for platform functionality.
-
-              By using the platform, you consent to the collection and use of information as described above.
-            </p>
-          </details>
-          <details className="bg-white border border-neutral-200 rounded-xl p-5">
-            <summary className="cursor-pointer text-lg font-semibold text-neutral-900">Terms of Use</summary>
-            <p className="text-sm text-neutral-700 leading-relaxed whitespace-pre-wrap mt-3">
-              Moolabase is provided as a free platform for connecting job posters and service providers.
-
-              Users are responsible for the accuracy of the information they post and for any interactions they engage in.
-
-              Moolabase does not guarantee job outcomes, service quality, or user conduct.
-
-              Misuse of the platform, including fraud or harassment, may result in account suspension or removal.
-            </p>
-          </details>
-        </div>
-      </section>
-
       {/* Footer */}
       <footer className="border-t bg-white mt-4">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 text-sm text-neutral-600 text-transparent relative">
-          <span className="text-neutral-600">&copy; 2025 MoolaBase.</span>
-          © 2025 MoolaBase.
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 text-sm text-neutral-600 flex justify-between items-center">
+          <span>&copy; 2025 MoolaBase.</span>
+          <div className="flex gap-4">
+            <Link href="/about" className="hover:underline">About</Link>
+            <Link href="/contact" className="hover:underline">Contact</Link>
+            <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
+            <Link href="/terms" className="hover:underline">Terms of Use</Link>
+          </div>
         </div>
       </footer>
     </main>
   )
 }
-
-
-

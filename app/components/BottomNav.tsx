@@ -4,35 +4,73 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Home, MessageCircle, User, Bell, List } from 'lucide-react'
+import { supabase } from '@/lib/supabase/client'
+import { isAbortError } from '@/lib/errors/isAbortError'
 
 export default function BottomNav() {
   const pathname = usePathname()
+
   const [notificationCount, setNotificationCount] = useState(0)
+  const [messageCount, setMessageCount] = useState(0)
 
   const isActive = (path: string) => pathname === path
 
   useEffect(() => {
     let mounted = true
+    let pollingInterval: ReturnType<typeof setInterval> | null = null
+    let unsubscribeAuth: (() => void) | null = null
 
-    const fetchCount = async () => {
+    const fetchCounts = async () => {
       try {
-        const res = await fetch('/api/notifications?summary=1')
-        if (!res.ok) return
-        const data = await res.json()
-        if (mounted) {
-          const count = Number(data?.count || 0)
-          setNotificationCount(Number.isNaN(count) ? 0 : count)
+        const { data } = await supabase.auth.getUser()
+        const userId = data?.user?.id ?? null
+
+        if (!mounted) return
+
+        if (!userId) {
+          setNotificationCount(0)
+          setMessageCount(0)
+          return
         }
+
+        const res = await fetch('/api/notifications?summary=1', { cache: 'no-store' })
+        const payload = await res.json().catch(() => ({}))
+        const nextNotificationCount = Number(payload?.count ?? 0)
+
+        if (!mounted) return
+
+        setNotificationCount(Number.isFinite(nextNotificationCount) ? nextNotificationCount : 0)
+
+        // Unread message counts are not implemented yet (no read-tracking in schema).
+        setMessageCount(0)
+      } catch (error) {
+        if (!mounted || isAbortError(error)) return
+        setNotificationCount(0)
+        setMessageCount(0)
+      }
+    }
+
+    void fetchCounts()
+
+    pollingInterval = setInterval(() => {
+      void fetchCounts()
+    }, 10000)
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
+      void fetchCounts()
+    })
+    unsubscribeAuth = () => {
+      try {
+        authListener.subscription.unsubscribe()
       } catch {
         // ignore
       }
     }
 
-    fetchCount()
-    const interval = setInterval(fetchCount, 60000)
     return () => {
       mounted = false
-      clearInterval(interval)
+      if (pollingInterval) clearInterval(pollingInterval)
+      unsubscribeAuth?.()
     }
   }, [])
 
@@ -75,7 +113,14 @@ export default function BottomNav() {
                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
             }`}
           >
-            <MessageCircle size={24} />
+            <div className="relative">
+              <MessageCircle size={24} />
+              {messageCount > 0 && (
+                <span className="absolute -top-1 -right-2 h-4 min-w-4 rounded-full bg-red-600 text-white text-[10px] font-semibold flex items-center justify-center px-1">
+                  {messageCount > 99 ? '99+' : messageCount}
+                </span>
+              )}
+            </div>
             <span className="text-xs font-medium">Messages</span>
           </Link>
 
@@ -91,7 +136,7 @@ export default function BottomNav() {
             <div className="relative">
               <Bell size={24} />
               {notificationCount > 0 && (
-                <span className="absolute -top-1 -right-2 h-4 min-w-[16px] rounded-full bg-red-600 text-white text-[10px] font-semibold flex items-center justify-center px-1">
+                <span className="absolute -top-1 -right-2 h-4 min-w-4 rounded-full bg-red-600 text-white text-[10px] font-semibold flex items-center justify-center px-1">
                   {notificationCount > 99 ? '99+' : notificationCount}
                 </span>
               )}

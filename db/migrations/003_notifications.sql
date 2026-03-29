@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   reference_id uuid,
   title text,
   message text,
+  read boolean DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 

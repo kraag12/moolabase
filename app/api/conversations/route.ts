@@ -2,39 +2,54 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
+  console.log('GET /api/conversations');
   try {
-    const supabase = await createClient()
+    const supabase = await createClient();
+    if (!supabase) {
+      console.error('Supabase client is not available');
+      return NextResponse.json({ error: 'Supabase client is not available' }, { status: 500 });
+    }
 
-    const { data: userData } = await supabase.auth.getUser()
-    const userId = userData?.user?.id
-    if (!userId) return NextResponse.json({ conversations: [] })
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+
+    if (userError) {
+      console.error('Supabase auth error:', userError);
+      return NextResponse.json({ error: 'Supabase auth error' }, { status: 500 });
+    }
+
+    const userId = userData?.user?.id;
+    if (!userId) {
+      // Not an error, but the user is not logged in.
+      return NextResponse.json({ conversations: [] });
+    }
 
     const { data, error } = await supabase
       .from('conversations')
       .select('*')
       .or(`user_1_id.eq.${userId},user_2_id.eq.${userId}`)
       .order('updated_at', { ascending: false })
-      .limit(50)
+      .limit(50);
 
     if (error) {
-      console.error('Conversation fetch error:', error)
-      const msg = String(error.message || '')
+      console.error('Conversation fetch error:', error);
+      const msg = String(error.message || '');
       if (msg.toLowerCase().includes('does not exist') || msg.toLowerCase().includes('relation')) {
-        return NextResponse.json({ error: 'Conversations table is missing. Run the DB migrations.' }, { status: 500 })
+        return NextResponse.json({ conversations: [] }, { status: 200 });
       }
       return NextResponse.json(
         { error: 'Failed to fetch conversations' },
         { status: 500 }
-      )
+      );
     }
 
-    return NextResponse.json({ conversations: data || [] })
+    return NextResponse.json({ conversations: data || [] });
   } catch (error: any) {
-    console.error('API error:', error)
+    console.error('API error in /api/conversations:', error);
+    const msg = String(error?.message || error || 'Server error');
     return NextResponse.json(
-      { error: 'Server error' },
+      { error: 'Server error', details: msg },
       { status: 500 }
-    )
+    );
   }
 }
 

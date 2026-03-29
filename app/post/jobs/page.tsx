@@ -17,11 +17,13 @@ export default function PostJobPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [redirecting, setRedirecting] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setSuccess(false)
+    setRedirecting(false)
 
     // Validation
     if (!title.trim()) {
@@ -42,6 +44,7 @@ export default function PostJobPage() {
     }
 
     setLoading(true)
+    const controller = new AbortController()
 
     try {
       const response = await fetch('/api/jobs', {
@@ -56,6 +59,7 @@ export default function PostJobPage() {
             response_time: responseTime,
             duration,
           }),
+        signal: controller.signal,
       })
 
       if (!response.ok) {
@@ -67,9 +71,11 @@ export default function PostJobPage() {
 
       const data = await response.json()
       setSuccess(true)
+      setRedirecting(true)
+      setLoading(false)
       setTimeout(() => {
         router.push('/jobs')
-      }, 600)
+      }, 700)
     } catch (err) {
       setError('An error occurred. Please try again.')
       setLoading(false)
@@ -88,7 +94,7 @@ export default function PostJobPage() {
           <p className="text-neutral-600">Fill in the details below to post your job listing.</p>
         </div>
 
-        <form className="space-y-6 bg-white p-8 rounded-lg border border-neutral-200" onSubmit={handleSubmit}>
+        <form className="space-y-6 bg-white p-8 rounded-2xl border border-neutral-200 shadow-sm" onSubmit={handleSubmit}>
           <div>
             <label className="font-semibold block mb-2 text-neutral-900">Job Title *</label>
             <input
@@ -111,70 +117,86 @@ export default function PostJobPage() {
             />
           </div>
 
-          <div>
-            <label className="font-semibold block mb-1">Location</label>
-            <input
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              type="text"
-              className="w-full border rounded-md px-3 py-2"
-              placeholder="City or area"
-            />
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="font-semibold block mb-2 text-neutral-900">Location *</label>
+              <input
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                type="text"
+                className="w-full border border-neutral-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition"
+                placeholder="City or area"
+              />
+            </div>
 
-          <div>
-            <label className="font-semibold block mb-1">Offer (R)</label>
-            <input
-              value={offer}
-              onChange={(e) => setOffer(e.target.value)}
-              type="number"
-              className="w-full border rounded-md px-3 py-2"
-              placeholder="Amount you’re offering"
-            />
+            <div>
+              <label className="font-semibold block mb-2 text-neutral-900">Offer (R) *</label>
+              <input
+                value={offer}
+                onChange={(e) => setOffer(e.target.value)}
+                type="number"
+                className="w-full border border-neutral-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition"
+                placeholder="0"
+                min="0"
+              />
+            </div>
           </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <label className="font-semibold block mb-2 text-neutral-900">Work type *</label>
+              <select value={workType} onChange={(e) => setWorkType(e.target.value)} className="w-full border border-neutral-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition">
+                <option value="local">Local</option>
+                <option value="remote">Remote</option>
+                <option value="both">Both</option>
+              </select>
+            </div>
 
-          <div>
-            <label className="font-semibold block mb-1">
-              How long should this job be up?
-            </label>
-            <select value={duration} onChange={(e) => setDuration(e.target.value)} className="w-full border rounded-md px-3 py-2">
-              <option value="3_days">3 days</option>
-              <option value="1_week">1 week</option>
-              <option value="2_weeks">2 weeks</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="font-semibold block mb-1">Work type *</label>
-            <select value={workType} onChange={(e) => setWorkType(e.target.value)} className="w-full border rounded-md px-3 py-2">
-              <option value="local">Local</option>
-              <option value="remote">Remote</option>
-              <option value="both">Both</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="font-semibold block mb-1">Response time *</label>
-            <select value={responseTime} onChange={(e) => setResponseTime(e.target.value)} className="w-full border rounded-md px-3 py-2">
-              <option value="urgent">Urgent</option>
-              <option value="flexible">Flexible</option>
-            </select>
+            <div>
+              <label className="font-semibold block mb-2 text-neutral-900">Response time *</label>
+              <select value={responseTime} onChange={(e) => setResponseTime(e.target.value)} className="w-full border border-neutral-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition">
+                <option value="urgent">Urgent</option>
+                <option value="flexible">Flexible</option>
+              </select>
+            </div>
+            <div>
+              <label className="font-semibold block mb-2 text-neutral-900">
+                Job post duration
+              </label>
+              <select value={duration} onChange={(e) => setDuration(e.target.value)} className="w-full border border-neutral-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition">
+                <option value="3_days">3 days</option>
+                <option value="1_week">1 week</option>
+                <option value="2_weeks">2 weeks</option>
+                <option value="1_month">1 month</option>
+                <option value="max">Max</option>
+              </select>
+            </div>
           </div>
 
           {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">{error}</div>}
-          {success && <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">Job posted successfully! Redirecting...</div>}
+          {success && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center justify-between gap-4">
+              <span>Job posted successfully!</span>
+              {redirecting && (
+                <span className="inline-flex items-center gap-2 text-sm font-medium">
+                  <span className="h-2 w-2 rounded-full bg-green-600 animate-pulse"></span>
+                  Redirecting...
+                </span>
+              )}
+            </div>
+          )}
 
-          <div className="flex gap-4 pt-4">
+          <div className="flex flex-col sm:flex-row gap-4 pt-4">
             <button
               type="submit"
-              className="flex-1 bg-black text-white py-3 rounded-lg font-semibold hover:bg-neutral-800 disabled:opacity-60 disabled:cursor-not-allowed transition"
-              disabled={loading}
+              className="w-full sm:w-auto flex-1 bg-black text-white py-3 px-6 rounded-lg font-semibold hover:bg-neutral-800 disabled:opacity-60 disabled:cursor-not-allowed transition"
+              disabled={loading || redirecting}
             >
               {loading ? 'Posting...' : 'Post Job'}
             </button>
             <Link
               href="/"
-              className="flex-1 border border-neutral-300 py-3 rounded-lg font-semibold hover:bg-neutral-50 transition text-center"
+              className="w-full sm:w-auto flex-1 border border-neutral-300 py-3 px-6 rounded-lg font-semibold hover:bg-neutral-50 transition text-center"
             >
               Cancel
             </Link>

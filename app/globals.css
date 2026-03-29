@@ -7,3 +7,26 @@
     padding: 0;
   }
 }
+
+.route-progress-shell {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.route-progress-bar {
+  height: 100%;
+  width: 0%;
+  opacity: 0;
+  background: linear-gradient(90deg, #111111 0%, #4b5563 60%, #111111 100%);
+  transition: width 0.45s ease, opacity 0.2s ease;
+}
+
+.route-progress-bar-active {
+  width: 100%;
+  opacity: 0.9;
+}

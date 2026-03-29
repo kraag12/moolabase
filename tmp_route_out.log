@@ -1,0 +1,50 @@
+
+> moolabase@0.1.0 dev
+> next dev
+
+▲ Next.js 16.1.2 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.8:3000
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 25.1s
+○ Compiling /api/listings ...
+ GET /api/listings 200 in 8.1s (compile: 5.7s, render: 2.4s)
+ GET /api/listings 200 in 8.3s (compile: 5.4s, render: 2.9s)
+○ Compiling /api/notifications ...
+ GET /api/notifications?summary=1 500 in 10.8s (compile: 2.5s, proxy.ts: 6.6s, render: 1624ms)
+ GET /api/notifications?summary=1 500 in 11.4s (compile: 2.6s, proxy.ts: 6.9s, render: 1862ms)
+ GET /api/listings 200 in 1711ms (compile: 13ms, render: 1698ms)
+ GET /api/notifications?summary=1 500 in 2.3s (compile: 1228ms, proxy.ts: 374ms, render: 738ms)
+ GET / 200 in 31.5s (compile: 21.2s, proxy.ts: 6.8s, render: 3.6s)
+ GET /api/listings 200 in 1116ms (compile: 32ms, render: 1083ms)
+ GET /api/notifications?summary=1 500 in 1016ms (compile: 31ms, proxy.ts: 387ms, render: 598ms)
+ GET /api/listings 200 in 918ms (compile: 16ms, render: 903ms)
+ GET /api/notifications?summary=1 500 in 979ms (compile: 25ms, proxy.ts: 362ms, render: 592ms)
+ GET /api/notifications?summary=1 500 in 1324ms (compile: 34ms, proxy.ts: 488ms, render: 802ms)
+ GET /api/listings 200 in 946ms (compile: 15ms, render: 931ms)
+ GET /api/notifications?summary=1 500 in 1049ms (compile: 25ms, proxy.ts: 385ms, render: 639ms)
+ GET /api/listings 200 in 776ms (compile: 12ms, render: 765ms)
+ GET /api/notifications?summary=1 500 in 1461ms (compile: 24ms, proxy.ts: 433ms, render: 1004ms)
+ GET /api/listings 200 in 810ms (compile: 16ms, render: 794ms)
+ GET /api/notifications?summary=1 500 in 1423ms (compile: 66ms, proxy.ts: 755ms, render: 603ms)
+ GET /api/notifications?summary=1 500 in 1111ms (compile: 20ms, proxy.ts: 337ms, render: 754ms)
+ GET /api/listings 200 in 916ms (compile: 30ms, render: 885ms)
+ GET /api/notifications?summary=1 500 in 1067ms (compile: 19ms, proxy.ts: 388ms, render: 660ms)
+ GET /api/listings 200 in 707ms (compile: 11ms, render: 697ms)
+ GET /api/notifications?summary=1 500 in 1249ms (compile: 27ms, proxy.ts: 357ms, render: 865ms)
+ GET /api/listings 200 in 691ms (compile: 10ms, render: 681ms)
+ GET /api/notifications?summary=1 500 in 905ms (compile: 17ms, proxy.ts: 298ms, render: 589ms)
+ GET /api/notifications?summary=1 500 in 1149ms (compile: 23ms, proxy.ts: 389ms, render: 737ms)
+ GET /api/listings 200 in 661ms (compile: 9ms, render: 652ms)
+ GET /api/notifications?summary=1 500 in 894ms (compile: 30ms, proxy.ts: 333ms, render: 531ms)
+ GET /api/listings 200 in 661ms (compile: 15ms, render: 646ms)
+ GET /api/notifications?summary=1 500 in 1454ms (compile: 29ms, proxy.ts: 885ms, render: 540ms)
+ GET /api/listings 200 in 783ms (compile: 19ms, render: 765ms)
+ GET /api/notifications?summary=1 500 in 913ms (compile: 17ms, proxy.ts: 329ms, render: 567ms)
+ GET /api/notifications?summary=1 500 in 948ms (compile: 15ms, proxy.ts: 336ms, render: 596ms)
+ GET /api/listings 200 in 661ms (compile: 14ms, render: 647ms)
+ GET /api/notifications?summary=1 500 in 982ms (compile: 35ms, proxy.ts: 345ms, render: 602ms)
+ GET /api/listings 200 in 664ms (compile: 17ms, render: 648ms)
+ GET /api/notifications?summary=1 500 in 1073ms (compile: 21ms, proxy.ts: 470ms, render: 582ms)

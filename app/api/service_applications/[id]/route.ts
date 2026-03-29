@@ -1,16 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveColumn } from '@/lib/supabase/schema'
+import { insertNotificationRobust } from '@/lib/notifications/insertNotification'
 
-async function getServiceOwnerId(supabase: any, serviceId: string) {
-  const ownerColumn = await resolveColumn(supabase, 'services', 'poster_id', 'user_id')
+async function getServiceDetails(supabase: any, serviceId: string) {
   const { data, error } = await supabase
     .from('services')
-    .select(`id,${ownerColumn}`)
+    .select('*')
     .eq('id', serviceId)
-    .single()
+    .maybeSingle()
+
   if (error) throw new Error(error.message)
-  return data?.[ownerColumn] as string | null
+  const record = (data || {}) as any
+
+  return {
+    title: (record.title as string | null) ?? null,
+    ownerId: (record.poster_id as string | null) ?? (record.user_id as string | null) ?? null,
+  }
+}
+
+async function getPosterUsername(supabase: any, posterId: string) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('username')
+    .eq('id', posterId)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  return data?.username as string | null
+}
+
+async function getUsername(supabase: any, userId: string) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('username')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  return (data?.username as string | null) ?? null
 }
 
 async function getOrCreateConversation(supabase: any, ownerId: string, applicantId: string) {
@@ -41,12 +69,14 @@ async function getOrCreateConversation(supabase: any, ownerId: string, applicant
   return created?.[0]
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const supabase = await createClient()
     const body = await request.json()
     const { status } = body
-    const { id } = params
+    const resolvedParams = await context.params
+    const id = resolvedParams?.id as string | undefined
+
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
     if (!status) return NextResponse.json({ error: 'Missing status' }, { status: 400 })
     if (!['accepted', 'rejected', 'pending'].includes(status)) {
@@ -57,43 +87,102 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const userId = userData?.user?.id
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    const applicantColumn = await resolveColumn(supabase as any, 'service_applications', 'user_id', 'applicant_id')
+
     const { data: current, error: fetchError } = await supabase
-      .from('applications')
-      .select('id, listing_id, listing_type, applicant_id, status')
+      .from('service_applications')
+      .select('*')
       .eq('id', id)
-      .single()
+      .maybeSingle()
 
     if (fetchError || !current) {
       return NextResponse.json({ error: 'Application not found' }, { status: 404 })
     }
 
-    if (current.listing_type !== 'service') {
-      return NextResponse.json({ error: 'Invalid application type' }, { status: 400 })
-    }
-
-    const ownerId = await getServiceOwnerId(supabase, current.listing_id)
+    const currentApp = current as any
+    const { title: serviceTitle, ownerId } = await getServiceDetails(supabase, currentApp.service_id)
     if (!ownerId || ownerId !== userId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    let conversationId: string | null = null
+    let acceptedApplicantId: string | null = null
+
+    if (status === 'accepted') {
+      acceptedApplicantId = (currentApp?.[applicantColumn] as string | null) ?? null
+      if (!acceptedApplicantId) {
+        return NextResponse.json({ error: 'Application applicant not found' }, { status: 500 })
+      }
+
+      const conversation = await getOrCreateConversation(supabase, ownerId, acceptedApplicantId)
+      conversationId = conversation?.id ?? null
+      if (!conversationId) {
+        return NextResponse.json({ error: 'Failed to create conversation' }, { status: 500 })
+      }
+    }
+
     const { data, error } = await supabase
-      .from('applications')
+      .from('service_applications')
       .update({ status })
       .eq('id', id)
-      .select()
+      .select('*')
+      .maybeSingle()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (!data) return NextResponse.json({ error: 'Application not found' }, { status: 404 })
 
-    const updatedApp = data?.[0]
-    let conversationId: string | null = null
+    const updatedApp = data as any
 
     if (status === 'accepted') {
       try {
-        const applicantId = updatedApp?.applicant_id
-        if (applicantId && ownerId) {
-          const conversation = await getOrCreateConversation(supabase, ownerId, applicantId)
-          conversationId = conversation?.id ?? null
+        const applicantId = acceptedApplicantId
+        if (!applicantId || !conversationId) return NextResponse.json({ application: updatedApp, conversation_id: null })
+
+        let posterUsername: string | null = null
+        let applicantUsername: string | null = null
+        try {
+          posterUsername = await getPosterUsername(supabase, ownerId)
+          applicantUsername = await getUsername(supabase, applicantId)
+        } catch (profileError) {
+          console.warn('Username lookup failed during acceptance:', profileError)
         }
+        const ownerDisplay = posterUsername ? `@${posterUsername}` : 'the listing owner'
+        const applicantDisplay = applicantUsername ? `@${applicantUsername}` : 'the applicant'
+
+        const applicantNotification = await insertNotificationRobust(supabase as any, {
+          user_id: applicantId,
+          sender_id: ownerId,
+          type: 'service_application_accepted',
+          reference_id: updatedApp.id,
+          title: `Application accepted for "${serviceTitle}"`,
+          message: `Your application has been accepted. You are now connected to ${ownerDisplay}. Start chatting now.`,
+          listing_type: 'service',
+          listing_id: currentApp.service_id,
+          conversation_id: conversationId,
+        })
+        if (!applicantNotification.ok) {
+          console.warn('Failed to insert service acceptance notification:', applicantNotification.error)
+        }
+
+        const ownerNotification = await insertNotificationRobust(supabase as any, {
+          user_id: ownerId,
+          sender_id: applicantId,
+          type: 'service_application_connected',
+          reference_id: updatedApp.id,
+          title: 'Applicant connected',
+          message: `You are now connected to ${applicantDisplay}. Start chatting now.`,
+          listing_type: 'service',
+          listing_id: currentApp.service_id,
+          conversation_id: conversationId,
+        })
+        if (!ownerNotification.ok) {
+          console.warn('Failed to insert owner connection notification:', ownerNotification.error)
+        }
+
+        await supabase
+          .from('conversations')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', conversationId)
       } catch (e) {
         console.warn('Post-accept actions failed', e)
       }
@@ -101,6 +190,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     return NextResponse.json({ application: updatedApp, conversation_id: conversationId })
   } catch (e: any) {
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    console.error('Error in PATCH service_applications:', e)
+    return NextResponse.json({ error: 'Server error: ' + e.message }, { status: 500 })
   }
 }

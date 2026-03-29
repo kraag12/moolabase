@@ -1,0 +1,29 @@
+
+> moolabase@0.1.0 dev
+> next dev
+
+▲ Next.js 16.1.2 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.8:3000
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 22.7s
+○ Compiling /api/listings ...
+○ Compiling /api/notifications ...
+ GET /api/listings 200 in 8.4s (compile: 100ms, render: 8.3s)
+ GET /api/listings 200 in 16.4s (compile: 7.1s, render: 9.3s)
+ GET /api/notifications?summary=1 500 in 17.5s (compile: 4.5s, proxy.ts: 8.6s, render: 4.4s)
+ GET /api/notifications?summary=1 500 in 17.6s (compile: 6.0s, proxy.ts: 8.5s, render: 3.1s)
+ GET /api/listings 200 in 1073ms (compile: 149ms, render: 924ms)
+ GET /api/notifications?summary=1 500 in 5.7s (compile: 263ms, proxy.ts: 4.7s, render: 751ms)
+ GET /api/listings 200 in 1734ms (compile: 1042ms, render: 692ms)
+ GET /api/listings 200 in 552ms (compile: 325ms, render: 227ms)
+ GET / 200 in 39.2s (compile: 19.9s, proxy.ts: 8.3s, render: 11.0s)
+ GET /api/listings 200 in 1984ms (compile: 635ms, render: 1349ms)
+ GET /api/notifications?summary=1 500 in 1344ms (compile: 95ms, proxy.ts: 411ms, render: 838ms)
+ GET /api/notifications?summary=1 500 in 1001ms (compile: 21ms, proxy.ts: 403ms, render: 577ms)
+ GET /api/listings 200 in 811ms (compile: 28ms, render: 783ms)
+ GET /api/notifications?summary=1 500 in 999ms (compile: 32ms, proxy.ts: 351ms, render: 616ms)
+ GET /api/listings 200 in 691ms (compile: 30ms, render: 662ms)
+ GET /api/notifications?summary=1 500 in 924ms (compile: 21ms, proxy.ts: 357ms, render: 546ms)

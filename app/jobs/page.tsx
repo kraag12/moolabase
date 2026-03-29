@@ -1,9 +1,14 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { Search, RefreshCw, MapPin } from 'lucide-react'
+import { Search, RefreshCw, MapPin, AlertTriangle } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
+import HeaderAuthActions from '@/app/components/HeaderAuthActions'
+import { fetchListingsClient } from '@/lib/listings/fetchListingsClient'
+import { isAbortError } from '@/lib/errors/isAbortError'
+import { getListingHref } from '@/lib/listings/url'
+import { ABORT_REASON } from '@/lib/abort-reason'
 
 type Listing = {
   id: string | number
@@ -14,6 +19,7 @@ type Listing = {
   poster_avatar_url?: string | null
   type: 'job' | 'service'
   created_at: string
+  response_time?: string | null
 }
 
 const ITEMS_PER_PAGE = 10
@@ -25,6 +31,10 @@ export default function JobsPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const isMountedRef = useRef(true)
+  const fetchInFlightRef = useRef(false)
+  const lastBackgroundRefreshRef = useRef(0)
+  const fetchControllerRef = useRef<AbortController | null>(null)
 
   const formatTimeAgo = (dateString: string) => {
     const posted = new Date(dateString)
@@ -47,76 +57,152 @@ export default function JobsPage() {
   }
 
   // Fetch all listings
-  async function fetchListings() {
+  const fetchListings = useCallback(async (options?: { resetPage?: boolean; showLoading?: boolean }) => {
+    fetchControllerRef.current?.abort(ABORT_REASON)
+    const controller = new AbortController()
+    fetchControllerRef.current = controller
+    fetchInFlightRef.current = true
+
+    const resetPage = options?.resetPage ?? true
+    const showLoading = options?.showLoading ?? true
+
     try {
-      const res = await fetch('/api/listings')
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        console.error('Listings API error:', data)
+      if (showLoading && isMountedRef.current) {
+        setLoading(true)
+      }
+
+      const res = await fetch('/api/listings', {
+        cache: 'no-store',
+        signal: controller.signal,
+      })
+
+      if (res.status === 304) {
         return
       }
 
-      const data = await res.json()
+      if (!res.ok) {
+        const raw = await res.text().catch(() => '')
+        let data: Record<string, unknown> = {}
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw)
+            data = parsed && typeof parsed === 'object' ? parsed : { raw: String(parsed) }
+          } catch {
+            data = { raw }
+          }
+        }
+        const errorDetails = {
+          status: Number.isFinite(res.status) ? res.status : null,
+          statusText: res.statusText || null,
+          url: res.url || '/api/listings',
+          ...data,
+        }
+        console.error('Listings API error:', JSON.stringify(errorDetails))
+        try {
+          const fallbackListings = await fetchListingsClient(supabase)
+          if (isMountedRef.current) {
+            setAllListings(fallbackListings)
+            setFilteredListings(fallbackListings)
+            if (resetPage) setCurrentPage(1)
+          }
+        } catch (fallbackError) {
+          if (!isAbortError(fallbackError)) {
+            console.error('Listings fallback error:', fallbackError)
+          }
+        }
+        return
+      }
+
+      const data = await res.json().catch(() => ({}))
       const listings = data?.listings ?? []
-      setAllListings(listings)
-      setFilteredListings(listings)
-      setCurrentPage(1)
+      if (isMountedRef.current) {
+        setAllListings(listings)
+        setFilteredListings(listings)
+        if (resetPage) setCurrentPage(1)
+      }
     } catch (err) {
-      console.error('Fetch error:', err)
+      if (!isAbortError(err)) {
+        console.error('Fetch error:', err)
+      }
+    } finally {
+      fetchInFlightRef.current = false
+      if (isMountedRef.current) {
+        setLoading(false)
+      }
     }
-  }
+  }, [])
+
+  const fetchListingsFromBackground = useCallback(() => {
+    const now = Date.now()
+    if (now - lastBackgroundRefreshRef.current < 3000) return
+    lastBackgroundRefreshRef.current = now
+    if (isMountedRef.current) {
+      void fetchListings({ resetPage: false, showLoading: false })
+    }
+  }, [fetchListings])
 
   // Fetch all listings on mount and set up refresh
   useEffect(() => {
+    let jobsSubscription: ReturnType<typeof supabase.channel> | null = null
+    let servicesSubscription: ReturnType<typeof supabase.channel> | null = null
+    let cancelled = false
+    isMountedRef.current = true
+
     async function init() {
-      setLoading(true)
-      await fetchListings()
-      setLoading(false)
+      await fetchListings({ resetPage: true, showLoading: true })
+      if (cancelled) return
 
       // Try to set up realtime subscriptions (optional)
       try {
-        const jobsSubscription = supabase
+        jobsSubscription = supabase
           .channel('jobs-changes')
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'jobs' },
             () => {
-              fetchListings()
+              fetchListingsFromBackground()
             }
           )
           .subscribe()
 
-        const servicesSubscription = supabase
+        servicesSubscription = supabase
           .channel('services-changes')
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'services' },
             () => {
-              fetchListings()
+              fetchListingsFromBackground()
             }
           )
           .subscribe()
-
-        return () => {
-          try {
-            jobsSubscription.unsubscribe()
-            servicesSubscription.unsubscribe()
-          } catch {}
-        }
       } catch (e) {
-        // If realtime setup fails (likely missing client keys), silently continue — polling/refresh will work
+        // If realtime setup fails, polling/manual refresh will still work.
         // eslint-disable-next-line no-console
         console.warn('Realtime disabled:', e)
       }
     }
 
     init()
-  }, [])
+    const interval = setInterval(() => {
+      fetchListingsFromBackground()
+    }, 20000)
+
+    return () => {
+      cancelled = true
+      isMountedRef.current = false
+      clearInterval(interval)
+      fetchControllerRef.current?.abort(ABORT_REASON)
+      try {
+        jobsSubscription?.unsubscribe()
+        servicesSubscription?.unsubscribe()
+      } catch {}
+    }
+  }, [fetchListings, fetchListingsFromBackground])
 
   const handleRefresh = async () => {
     setRefreshing(true)
-    await fetchListings()
-    setRefreshing(false)
+    await fetchListings({ resetPage: false, showLoading: false })
+    if (isMountedRef.current) setRefreshing(false)
   }
 
   // Filter based on search query
@@ -160,20 +246,7 @@ export default function JobsPage() {
             <Link href="/" className="text-2xl sm:text-4xl font-bold tracking-tight hover:text-neutral-700 transition">
               MOOLABASE
             </Link>
-            <div className="flex gap-2 sm:gap-3">
-              <Link
-                href="/signup"
-                className="px-3 sm:px-4 py-2 border border-black rounded-md hover:bg-neutral-50 transition font-medium text-sm sm:text-base"
-              >
-                Sign Up
-              </Link>
-              <Link
-                href="/login"
-                className="px-3 sm:px-4 py-2 bg-black text-white rounded-md hover:bg-neutral-800 transition font-medium text-sm sm:text-base"
-              >
-                Log In
-              </Link>
-            </div>
+            <HeaderAuthActions />
           </div>
         </div>
       </header>
@@ -234,13 +307,13 @@ export default function JobsPage() {
             <div className="border-t border-neutral-200 mt-10 mb-8"></div>
             <div className="flex flex-col gap-4 mb-8">
               {paginatedListings.map((listing) => {
-                const href =
-                  listing.type === 'service'
-                    ? `/post/jobs/service/${listing.id}`
-                    : `/post/jobs/${listing.id}`
+                if (!listing.id) return null
+                const idStr = String(listing.id).trim()
+                if (!idStr) return null
+                const href = getListingHref(idStr, listing.type)
 
                 return (
-                  <Link key={`${listing.type}-${String(listing.id)}`} href={href} className="block">
+                  <Link key={`${listing.type}-${idStr}`} href={href} className="block">
                     <div className="bg-gradient-to-br from-white to-neutral-50 border border-neutral-200 rounded-xl p-5 sm:p-6 shadow-sm hover:shadow-xl hover:border-neutral-300 transition cursor-pointer w-full max-w-2xl mx-auto">
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="flex items-start gap-3">
@@ -252,9 +325,17 @@ export default function JobsPage() {
                             />
                           </div>
                           <div>
-                            <h3 className="text-lg sm:text-xl font-extrabold text-neutral-900 leading-snug tracking-tight line-clamp-2">
-                              {listing.title}
-                            </h3>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-lg sm:text-xl font-extrabold text-neutral-900 leading-snug tracking-tight line-clamp-2">
+                                {listing.title}
+                              </h3>
+                              {listing.type === 'job' && listing.response_time === 'urgent' && (
+                                <div className="flex items-center gap-1 text-red-600 bg-red-100 border border-red-200 px-2 py-0.5 rounded-full">
+                                  <AlertTriangle size={12} />
+                                  <span className="text-xs font-semibold">URGENT</span>
+                                </div>
+                              )}
+                            </div>
                             <p className="text-xs text-neutral-500">
                               @{listing.poster_username || 'member'}
                             </p>
@@ -265,7 +346,8 @@ export default function JobsPage() {
                         </span>
                       </div>
                       <p className="text-sm text-neutral-800 mb-1">
-                        Offer: {listing.offer !== null && listing.offer !== undefined ? `R ${Number(listing.offer).toLocaleString()}` : 'Not specified'}
+                        {listing.type === 'service' ? 'Rate' : 'Offer'}:{' '}
+                        {listing.offer !== null && listing.offer !== undefined ? `R ${Number(listing.offer).toLocaleString()}` : 'Not specified'}
                       </p>
                       <div className="flex items-center gap-2 text-sm text-neutral-600 mb-2">
                         <MapPin size={14} className="text-neutral-500" />
@@ -319,16 +401,16 @@ export default function JobsPage() {
       {/* Footer */}
       <footer className="border-t bg-white mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 text-sm text-neutral-600 flex flex-col sm:flex-row gap-6">
-          <Link href="#" className="hover:text-neutral-900 transition">
+          <Link href="/about" className="hover:text-neutral-900 transition">
             About
           </Link>
-          <Link href="#" className="hover:text-neutral-900 transition">
+          <Link href="/contact" className="hover:text-neutral-900 transition">
             Contact
           </Link>
-          <Link href="#" className="hover:text-neutral-900 transition">
+          <Link href="/terms" className="hover:text-neutral-900 transition">
             Terms
           </Link>
-          <Link href="#" className="hover:text-neutral-900 transition">
+          <Link href="/privacy" className="hover:text-neutral-900 transition">
             Privacy
           </Link>
         </div>

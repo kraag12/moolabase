@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase/client'
+import { isAbortError } from '@/lib/errors/isAbortError'
+import { getListingHref } from '@/lib/listings/url'
 
 export default function PostServicePage() {
   const router = useRouter()
@@ -24,42 +26,64 @@ export default function PostServicePage() {
   const [error, setError] = useState<string | null>(null)
   const [imageError, setImageError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [redirecting, setRedirecting] = useState(false)
+  const [imageInputKey, setImageInputKey] = useState(0)
 
   async function uploadImages(): Promise<string[]> {
     if (imageFiles.length === 0) return []
 
+    const { data: authData } = await supabase.auth.getUser()
+    const userId = authData?.user?.id
+    if (!userId) {
+      throw new Error('Please log in before uploading images.')
+    }
+
     const urls: string[] = []
+    const uploadErrors: string[] = []
     setUploading(true)
 
-    for (const file of imageFiles.slice(0, 3)) {
-      if (!allowedImageTypes.includes(file.type)) {
-        console.warn('Skipping unsupported file type:', file.type)
-        continue
-      }
-
-      try {
-        const timestamp = Date.now()
-        const filename = `${timestamp}-${file.name}`
-        const { data, error } = await supabase.storage
-          .from(storageBucket)
-          .upload(`service-images/${filename}`, file, { contentType: file.type })
-
-        if (error) {
-          console.error('Upload error:', error)
+    try {
+      for (const file of imageFiles.slice(0, 3)) {
+        if (!allowedImageTypes.includes(file.type)) {
+          uploadErrors.push(`Unsupported file type: ${file.type}`)
           continue
         }
 
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from(storageBucket).getPublicUrl(`service-images/${filename}`)
+        try {
+          const timestamp = Date.now()
+          const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+          const filename = `${timestamp}-${safeName}`
+          const objectPath = `${userId}/service-images/${filename}`
+          const { error } = await supabase.storage
+            .from(storageBucket)
+            .upload(objectPath, file, { contentType: file.type })
 
-        urls.push(publicUrl)
-      } catch (e) {
-        console.error('Exception uploading image:', e)
+          if (error) {
+            uploadErrors.push(error.message || 'Upload failed')
+            continue
+          }
+
+          const {
+            data: { publicUrl },
+          } = supabase.storage.from(storageBucket).getPublicUrl(objectPath)
+
+          urls.push(publicUrl)
+        } catch (e: any) {
+          uploadErrors.push(String(e?.message || e || 'Upload exception'))
+        }
       }
+    } finally {
+      setUploading(false)
     }
 
-    setUploading(false)
+    if (imageFiles.length > 0 && urls.length === 0) {
+      throw new Error(uploadErrors[0] || 'Failed to upload images')
+    }
+
+    if (uploadErrors.length > 0) {
+      setImageError(`Some images failed to upload. Uploaded ${urls.length}/${imageFiles.length}.`)
+    }
+
     return urls
   }
 
@@ -67,6 +91,7 @@ export default function PostServicePage() {
     e.preventDefault()
     setError(null)
     setSuccess(false)
+    setRedirecting(false)
 
     // Validation
     if (!title.trim()) {
@@ -87,11 +112,12 @@ export default function PostServicePage() {
     }
 
     setLoading(true)
-
-    // Upload images if provided
-    const imageUrls = await uploadImages()
+    const controller = new AbortController()
 
     try {
+      // Upload images if provided
+      const imageUrls = await uploadImages()
+
       const response = await fetch('/api/services', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -104,6 +130,7 @@ export default function PostServicePage() {
           tools: tools.trim() || null,
           image_url: imageUrls.length > 0 ? imageUrls : null,
         }),
+        signal: controller.signal,
       })
 
       if (!response.ok) {
@@ -115,11 +142,17 @@ export default function PostServicePage() {
 
       const data = await response.json()
       setSuccess(true)
+      setRedirecting(true)
       setTimeout(() => {
-        router.push('/jobs')
-      }, 600)
+        router.push(getListingHref(data.id, 'service'))
+      }, 700)
     } catch (err) {
-      setError('An error occurred. Please try again.')
+      if (isAbortError(err)) {
+        setError('Request was cancelled. Please try again.')
+      } else {
+        setError('An error occurred. Please try again.')
+      }
+    } finally {
       setLoading(false)
     }
   }
@@ -136,6 +169,17 @@ export default function PostServicePage() {
       setImageError(null)
       setImageFiles(files)
     }
+  }
+
+  const removeImageAt = (index: number) => {
+    setImageFiles((prev) => prev.filter((_, i) => i !== index))
+    setImageInputKey((prev) => prev + 1)
+  }
+
+  const clearAllImages = () => {
+    setImageFiles([])
+    setImageError(null)
+    setImageInputKey((prev) => prev + 1)
   }
 
   useEffect(() => {
@@ -159,7 +203,7 @@ export default function PostServicePage() {
           <p className="text-neutral-600">Fill in the details below to list your service.</p>
         </div>
 
-        <form className="space-y-6 bg-white p-8 rounded-lg border border-neutral-200" onSubmit={handleSubmit}>
+        <form className="space-y-6 bg-white p-8 rounded-2xl border border-neutral-200 shadow-sm" onSubmit={handleSubmit}>
           <div>
             <label className="font-semibold block mb-2 text-neutral-900">Service Title *</label>
             <input
@@ -206,29 +250,31 @@ export default function PostServicePage() {
               />
             </div>
           </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="font-semibold block mb-2 text-neutral-900">Work Type *</label>
+              <select
+                value={workType}
+                onChange={(e) => setWorkType(e.target.value)}
+                className="w-full border border-neutral-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition"
+              >
+                <option value="local">Local</option>
+                <option value="remote">Remote</option>
+                <option value="both">Both</option>
+              </select>
+            </div>
 
-          <div>
-            <label className="font-semibold block mb-2 text-neutral-900">Work Type *</label>
-            <select
-              value={workType}
-              onChange={(e) => setWorkType(e.target.value)}
-              className="w-full border border-neutral-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition"
-            >
-              <option value="local">Local</option>
-              <option value="remote">Remote</option>
-              <option value="both">Both</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="font-semibold block mb-2 text-neutral-900">Tools & Equipment</label>
-            <input
-              value={tools}
-              onChange={(e) => setTools(e.target.value)}
-              type="text"
-              className="w-full border border-neutral-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition"
-              placeholder="e.g. Lawn mower, hedge trimmer"
-            />
+            <div>
+              <label className="font-semibold block mb-2 text-neutral-900">Tools & Equipment</label>
+              <input
+                value={tools}
+                onChange={(e) => setTools(e.target.value)}
+                type="text"
+                className="w-full border border-neutral-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition"
+                placeholder="e.g. Lawn mower, hedge trimmer"
+              />
+            </div>
           </div>
 
           <div>
@@ -236,6 +282,7 @@ export default function PostServicePage() {
             <div className="flex flex-col gap-3">
               <label className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-neutral-300 bg-neutral-50 hover:bg-neutral-100 transition cursor-pointer font-medium text-neutral-800">
                 <input
+                  key={imageInputKey}
                   type="file"
                   multiple
                   accept="image/jpeg,image/png"
@@ -248,12 +295,31 @@ export default function PostServicePage() {
               {imageError && <p className="text-sm text-red-600">{imageError}</p>}
 
               {previewUrls.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-neutral-700">{previewUrls.length} image(s) selected</p>
+                    <button
+                      type="button"
+                      onClick={clearAllImages}
+                      className="text-sm text-red-600 hover:text-red-700"
+                    >
+                      Remove all
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {previewUrls.map((src, index) => (
                     <div key={`${src}-${index}`} className="border border-neutral-200 rounded-lg overflow-hidden">
                       <img src={src} alt={`Preview ${index + 1}`} className="h-32 w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => removeImageAt(index)}
+                        className="w-full border-t border-neutral-200 py-2 text-sm text-red-600 hover:bg-red-50"
+                      >
+                        Remove image
+                      </button>
                     </div>
                   ))}
+                  </div>
                 </div>
               ) : (
                 <p className="text-sm text-neutral-600">No images selected.</p>
@@ -267,22 +333,28 @@ export default function PostServicePage() {
             </div>
           )}
           {success && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
-              Service posted successfully! Redirecting...
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center justify-between gap-4">
+              <span>Service posted successfully!</span>
+              {redirecting && (
+                <span className="inline-flex items-center gap-2 text-sm font-medium">
+                  <span className="h-2 w-2 rounded-full bg-green-600 animate-pulse"></span>
+                  Redirecting...
+                </span>
+              )}
             </div>
           )}
 
-          <div className="flex gap-4 pt-4">
+          <div className="flex flex-col sm:flex-row gap-4 pt-4">
             <button
               type="submit"
-              className="flex-1 bg-black text-white py-3 rounded-lg font-semibold hover:bg-neutral-800 disabled:opacity-60 disabled:cursor-not-allowed transition"
-              disabled={loading || uploading}
+              className="w-full sm:w-auto flex-1 bg-black text-white py-3 px-6 rounded-lg font-semibold hover:bg-neutral-800 disabled:opacity-60 disabled:cursor-not-allowed transition"
+              disabled={loading || uploading || redirecting}
             >
               {uploading ? 'Uploading images...' : loading ? 'Posting...' : 'Post Service'}
             </button>
             <Link
               href="/"
-              className="flex-1 border border-neutral-300 py-3 rounded-lg font-semibold hover:bg-neutral-50 transition text-center"
+              className="w-full sm:w-auto flex-1 border border-neutral-300 py-3 px-6 rounded-lg font-semibold hover:bg-neutral-50 transition text-center"
             >
               Cancel
             </Link>

@@ -3,180 +3,195 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Send, ImagePlus } from 'lucide-react'
+import { ArrowLeft, Send, BadgeCheck } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
+import { isAbortError } from '@/lib/errors/isAbortError'
+import { ABORT_REASON } from '@/lib/abort-reason'
 
-interface Message {
-  id: string
-  conversation_id: string
-  sender_id: string
-  content: string
-  created_at: string
+interface Conversation {
+  id: string;
+  locked: boolean;
+  user_1_id: string;
+  user_2_id: string;
 }
 
+interface Message {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+}
+
+const MOOLABASE_USER_ID = 'a81a7258-2e86-5309-8714-3358315a6b05';
+
 export default function MessageThreadPage() {
-  const params = useParams()
-  const conversationId = params.id as string
+  const params = useParams();
+  const conversationId = params.id as string;
 
-  const allowedImageTypes = ['image/jpeg', 'image/png']
-  const storageBucket = 'avatars'
-
-  const [messages, setMessages] = useState<Message[]>([])
-  const [content, setContent] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [sending, setSending] = useState(false)
-  const [error, setError] = useState('')
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [imageError, setImageError] = useState('')
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [conversation, setConversation] = useState<Conversation | null>(null);
+  const [content, setContent] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [otherProfile, setOtherProfile] = useState<{ username?: string | null; avatar_url?: string | null } | null>(
+    null
+  );
 
   // Fetch messages on mount and periodically
   useEffect(() => {
-    if (!conversationId) return
-    let interval: NodeJS.Timeout | null = null
-    ;(async () => {
-      const { data } = await supabase.auth.getUser()
-      const userId = data?.user?.id ?? null
-      setCurrentUserId(userId)
-      if (!userId) {
-        setError('Please log in to view this conversation.')
-        setLoading(false)
-        return
+    if (!conversationId) return;
+    let cancelled = false;
+    let interval: NodeJS.Timeout | null = null;
+    const fetchController = new AbortController();
+
+    // Wrap these functions to respect `cancelled` flag and abort signal
+    const fetchConversationDetails = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('conversations')
+          .select('id, locked, user_1_id, user_2_id')
+          .eq('id', conversationId)
+          .single();
+        if (cancelled) return;
+        if (error) throw error;
+        setConversation(data as Conversation);
+      } catch (err: any) {
+        if (!cancelled) {
+          console.error('Fetch conversation details error:', err);
+        }
       }
-      fetchMessages()
-      interval = setInterval(fetchMessages, 3000)
-    })()
+    };
+
+    const fetchMessages = async () => {
+      try {
+        const response = await fetch(`/api/messages?conversation_id=${conversationId}`, {
+          signal: fetchController.signal,
+        });
+        if (!response.ok) throw new Error('Failed to fetch messages');
+        const data = await response.json();
+        if (cancelled) return;
+        setMessages(data.messages || []);
+        setError('');
+      } catch (err: any) {
+        if (cancelled || isAbortError(err)) return;
+        console.error('Fetch error:', err);
+        if (!cancelled) setError(err.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getUser();
+        if (cancelled) return;
+        const userId = data?.user?.id ?? null;
+        setCurrentUserId(userId);
+        if (!userId) {
+          if (!cancelled) setError('Please log in to view this conversation.');
+          if (!cancelled) setLoading(false);
+          return;
+        }
+        await fetchConversationDetails();
+        if (!cancelled) {
+          await fetchMessages();
+          interval = setInterval(fetchMessages, 3000);
+        }
+      } catch (error) {
+        if (cancelled || isAbortError(error)) return;
+        if (!cancelled) setError('Failed to verify your session. Please refresh and try again.');
+        if (!cancelled) setLoading(false);
+      }
+    })();
     return () => {
-      if (interval) clearInterval(interval)
-    }
-  }, [conversationId])
+      cancelled = true;
+      if (interval) clearInterval(interval);
+      fetchController.abort(ABORT_REASON);
+    };
+  }, [conversationId]);
+
+  useEffect(() => {
+    if (!conversation || !currentUserId) return;
+    let cancelled = false;
+    const otherId =
+      conversation.user_1_id === currentUserId ? conversation.user_2_id : conversation.user_1_id;
+    if (!otherId) return;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('username, avatar_url, profile_picture_url')
+          .eq('id', otherId)
+          .maybeSingle();
+        if (cancelled) return;
+        if (!data) {
+          setOtherProfile(null);
+          return;
+        }
+        setOtherProfile({
+          username: data.username ?? null,
+          avatar_url: data.avatar_url || data.profile_picture_url || null,
+        });
+      } catch {
+        if (!cancelled) {
+          setOtherProfile(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [conversation, currentUserId]);
 
   // Auto-scroll to bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
-  useEffect(() => {
-    if (!imageFile) {
-      setImagePreview(null)
-      return
-    }
-    const url = URL.createObjectURL(imageFile)
-    setImagePreview(url)
-    return () => {
-      URL.revokeObjectURL(url)
-    }
-  }, [imageFile])
 
-  const isImageContent = (value: string) => {
-    const lower = value.toLowerCase()
-    return (
-      (lower.startsWith('http://') || lower.startsWith('https://')) &&
-      (lower.includes('/message-images/') ||
-        lower.endsWith('.png') ||
-        lower.endsWith('.jpg') ||
-        lower.endsWith('.jpeg'))
-    )
-  }
-
-  async function fetchMessages() {
-    try {
-      const response = await fetch(`/api/messages?conversation_id=${conversationId}`)
-      if (!response.ok) throw new Error('Failed to fetch messages')
-      const data = await response.json()
-      setMessages(data.messages || [])
-      setError('')
-    } catch (err: any) {
-      console.error('Fetch error:', err)
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   async function sendMessage(text: string) {
-    const response = await fetch('/api/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        conversation_id: conversationId,
-        content: text,
-      }),
-    })
+    const controller = new AbortController();
+    try {
+      const response = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation_id: conversationId,
+          content: text,
+        }),
+        signal: controller.signal,
+      });
 
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}))
-      throw new Error(data.error || 'Failed to send message')
-    }
-  }
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to send message');
+      }
+     } finally {
+       // no-op: request completed
+     }
+   }
 
-  async function uploadMessageImage(file: File) {
-    const { data } = await supabase.auth.getUser()
-    const userId = data?.user?.id || currentUserId
-    if (!userId) {
-      throw new Error('Please log in to upload images.')
-    }
-
-    const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-    const filename = `${userId}-${Date.now()}.${extension}`
-    const filePath = `message-images/${filename}`
-    const { error } = await supabase.storage
-      .from(storageBucket)
-      .upload(filePath, file, { contentType: file.type })
-
-    if (error) {
-      throw new Error(error.message || 'Upload failed')
-    }
-
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from(storageBucket).getPublicUrl(filePath)
-
-    return publicUrl
-  }
-
-  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-    if (!allowedImageTypes.includes(file.type)) {
-      setImageError('Only JPG or PNG images are allowed.')
-      setImageFile(null)
-      return
-    }
-    setImageError('')
-    setImageFile(file)
-  }
 
   async function handleSendMessage(e: React.FormEvent) {
-    e.preventDefault()
-    if (sending) return
-    if (!content.trim() && !imageFile) return
+    e.preventDefault();
+    if (sending || conversation?.locked) return;
+    if (!content.trim()) return;
 
     try {
-      setSending(true)
-      setError('')
-      if (content.trim()) {
-        await sendMessage(content.trim())
-      }
-      if (imageFile) {
-        const imageUrl = await uploadMessageImage(imageFile)
-        if (imageUrl) {
-          await sendMessage(imageUrl)
-        }
-      }
-
-      setContent('')
-      setImageFile(null)
-      setImagePreview(null)
-      setImageError('')
-      await fetchMessages()
+      setSending(true);
+      setError('');
+      await sendMessage(content.trim());
+      setContent('');
     } catch (err: any) {
-      console.error('Send error:', err)
-      setError(err.message)
+      console.error('Send error:', err);
+      setError(err.message);
     } finally {
-      setSending(false)
+      setSending(false);
     }
   }
 
@@ -185,13 +200,33 @@ export default function MessageThreadPage() {
       {/* Header */}
       <div className="bg-white border-b border-neutral-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Link 
+          <Link
             href="/messages"
             className="text-neutral-500 hover:text-neutral-800 transition"
           >
             <ArrowLeft size={24} />
           </Link>
-          <h1 className="text-lg font-semibold text-neutral-900">Conversation</h1>
+          <div className="flex items-center gap-3 min-w-0">
+            {otherProfile?.avatar_url && (
+              <div className="h-9 w-9 rounded-full overflow-hidden border border-neutral-200">
+                <img
+                  src={otherProfile.avatar_url}
+                  alt="Profile"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            )}
+            <div className="min-w-0">
+              <h1 className="text-lg font-semibold text-neutral-900 inline-flex items-center gap-1 truncate">
+                {otherProfile?.username ? `@${otherProfile.username}` : 'Conversation'}
+                {(otherProfile?.username?.toLowerCase() === 'moolabase' ||
+                  (conversation &&
+                    (conversation.user_1_id === MOOLABASE_USER_ID || conversation.user_2_id === MOOLABASE_USER_ID))) && (
+                  <BadgeCheck size={16} className="text-blue-600" />
+                )}
+              </h1>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -232,15 +267,7 @@ export default function MessageThreadPage() {
                       : 'bg-white text-neutral-900 border border-neutral-200'
                   }`}
                 >
-                  {isImageContent(message.content) ? (
-                    <img
-                      src={message.content}
-                      alt="Message attachment"
-                      className="rounded-lg max-w-full h-auto"
-                    />
-                  ) : (
-                    <p className="text-wrap">{message.content}</p>
-                  )}
+                  <p className="text-wrap">{message.content}</p>
                   <p
                     className={`text-xs mt-1 ${
                       message.sender_id === currentUserId
@@ -260,43 +287,26 @@ export default function MessageThreadPage() {
 
       {/* Message Input */}
       <div className="bg-white border-t border-neutral-200 sticky bottom-0">
-        <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto px-4 py-4 space-y-3">
-          {imagePreview && (
-            <div className="flex items-center gap-3">
-              <div className="h-16 w-16 rounded-lg border border-neutral-200 overflow-hidden">
-                <img src={imagePreview} alt="Attachment preview" className="h-full w-full object-cover" />
-              </div>
-              <button
-                type="button"
-                onClick={() => setImageFile(null)}
-                className="text-sm text-neutral-600 hover:text-neutral-900"
-              >
-                Remove image
-              </button>
+        {conversation?.locked && (
+          <div className="max-w-4xl mx-auto px-4 pt-4">
+            <div className="bg-neutral-100 border border-neutral-200 text-neutral-600 text-sm text-center px-4 py-2 rounded-lg">
+              This conversation is read-only.
             </div>
-          )}
-          {imageError && <p className="text-sm text-red-600">{imageError}</p>}
+          </div>
+        )}
+        <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto px-4 py-4 space-y-3">
           <div className="flex gap-2 items-center">
-            <label className="inline-flex items-center justify-center h-11 w-11 rounded-lg border border-neutral-300 bg-neutral-50 hover:bg-neutral-100 transition cursor-pointer">
-              <ImagePlus size={18} className="text-neutral-700" />
-              <input
-                type="file"
-                accept="image/jpeg,image/png"
-                onChange={handleImageChange}
-                className="hidden"
-              />
-            </label>
             <input
               type="text"
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="Type a message..."
-              disabled={sending}
+              placeholder={conversation?.locked ? "This conversation is read-only" : "Type a message..."}
+              disabled={sending || conversation?.locked}
               className="flex-1 px-4 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black disabled:opacity-50"
             />
             <button
               type="submit"
-              disabled={(!content.trim() && !imageFile) || sending}
+              disabled={!content.trim() || sending || conversation?.locked}
               className="bg-black text-white px-4 py-2 rounded-lg hover:bg-neutral-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               <Send size={20} />
@@ -305,5 +315,6 @@ export default function MessageThreadPage() {
         </form>
       </div>
     </div>
-  )
+  );
 }
+

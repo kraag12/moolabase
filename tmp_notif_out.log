@@ -1,0 +1,36 @@
+
+> moolabase@0.1.0 dev
+> next dev
+
+▲ Next.js 16.1.2 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.8:3000
+- Environments: .env.local
+
+✓ Starting...
+✓ Ready in 13.4s
+○ Compiling / ...
+ GET /api/notifications?summary=1 200 in 14.8s (compile: 13.3s, proxy.ts: 141ms, render: 1313ms)
+ GET / 200 in 34.6s (compile: 26.0s, proxy.ts: 3.0s, render: 5.5s)
+ GET /api/notifications?summary=1 200 in 1715ms (compile: 149ms, proxy.ts: 669ms, render: 897ms)
+ GET /api/listings 200 in 4.6s (compile: 2.7s, render: 1845ms)
+ GET /api/listings 200 in 1812ms (compile: 21ms, render: 1791ms)
+ GET /api/notifications?summary=1 200 in 4.4s (compile: 419ms, proxy.ts: 1259ms, render: 2.7s)
+ GET /api/listings 200 in 2.9s (compile: 159ms, render: 2.7s)
+ GET /api/notifications?summary=1 200 in 1102ms (compile: 36ms, proxy.ts: 414ms, render: 652ms)
+ GET /api/listings 200 in 669ms (compile: 13ms, render: 656ms)
+ GET /api/notifications?summary=1 200 in 1238ms (compile: 79ms, proxy.ts: 344ms, render: 815ms)
+ GET /api/listings 200 in 797ms (compile: 24ms, render: 774ms)
+ GET /api/notifications?summary=1 200 in 1588ms (compile: 16ms, proxy.ts: 333ms, render: 1239ms)
+ GET /api/notifications?summary=1 200 in 1044ms (compile: 33ms, proxy.ts: 413ms, render: 599ms)
+ GET /api/listings 200 in 680ms (compile: 15ms, render: 665ms)
+ GET /api/notifications?summary=1 200 in 962ms (compile: 16ms, proxy.ts: 381ms, render: 565ms)
+ GET /api/listings 200 in 788ms (compile: 28ms, render: 760ms)
+ GET /api/notifications?summary=1 200 in 1104ms (compile: 26ms, proxy.ts: 365ms, render: 714ms)
+ GET /api/listings 200 in 794ms (compile: 39ms, render: 755ms)
+ GET /api/notifications?summary=1 200 in 924ms (compile: 20ms, proxy.ts: 334ms, render: 570ms)
+ GET /api/notifications?summary=1 200 in 954ms (compile: 23ms, proxy.ts: 371ms, render: 560ms)
+ GET /api/listings 200 in 789ms (compile: 15ms, render: 774ms)
+ GET /api/notifications?summary=1 200 in 1151ms (compile: 22ms, proxy.ts: 424ms, render: 704ms)
+ GET /api/listings 200 in 660ms (compile: 18ms, render: 641ms)
+○ Compiling /_error ...

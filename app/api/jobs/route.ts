@@ -53,6 +53,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const allowedDurations = new Set(['3_days', '1_week', '2_weeks', '1_month', 'max'])
+    const normalizedDuration = allowedDurations.has(duration) ? duration : '1_week'
+
     // Work type and response_time are required in the updated schema
     const insertData: any = {
       title: String(title).trim(),
@@ -61,7 +64,7 @@ export async function POST(request: NextRequest) {
       offer: Number(offer),
       work_type: work_type || 'local',
       response_time: response_time || 'flexible',
-      duration: duration || '1_week',
+      duration: normalizedDuration,
     }
 
     insertData[ownerColumn] = userId

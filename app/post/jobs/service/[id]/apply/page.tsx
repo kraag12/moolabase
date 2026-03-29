@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase/client'
+import { resolveColumn } from '@/lib/supabase/schema'
+import { ABORT_REASON } from '@/lib/abort-reason'
 
 export default function ApplyServicePage() {
   const params = useParams()
@@ -16,7 +18,29 @@ export default function ApplyServicePage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [alreadyApplied, setAlreadyApplied] = useState(false)
+  const [applicationChecked, setApplicationChecked] = useState(false)
   const [authChecked, setAuthChecked] = useState(false)
+
+  const serviceImages = useMemo(() => {
+    const value = service?.image_url
+    if (!value) return [] as string[]
+    if (Array.isArray(value)) return value.filter(Boolean).slice(0, 3)
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value)
+        if (Array.isArray(parsed)) return parsed.filter(Boolean).slice(0, 3)
+      } catch {
+        // ignore invalid JSON
+      }
+      return value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .slice(0, 3)
+    }
+    return [] as string[]
+  }, [service?.image_url])
 
   useEffect(() => {
     ;(async () => {
@@ -42,12 +66,46 @@ export default function ApplyServicePage() {
     })()
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+
+    if (!id) return
+    if (!userId) {
+      setAlreadyApplied(false)
+      setApplicationChecked(true)
+      return
+    }
+
+    setApplicationChecked(false)
+    ;(async () => {
+      try {
+        const applicantColumn = await resolveColumn(supabase as any, 'service_applications', 'user_id', 'applicant_id')
+        const { data } = await supabase
+          .from('service_applications')
+          .select('id')
+          .eq('service_id', id)
+          .eq(applicantColumn, userId)
+          .limit(1)
+        if (!cancelled) setAlreadyApplied(!!(data && data.length > 0))
+      } catch {
+        if (!cancelled) setAlreadyApplied(false)
+      } finally {
+        if (!cancelled) setApplicationChecked(true)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [id, userId])
+
   // fetch service details from merged listings endpoint
   useEffect(() => {
     if (!id) return
+    const controller = new AbortController()
     ;(async () => {
       try {
-        const res = await fetch('/api/listings')
+        const res = await fetch('/api/listings', { cache: 'no-store', signal: controller.signal })
         if (!res.ok) return
         const data = await res.json()
         const items = data?.listings || []
@@ -57,12 +115,18 @@ export default function ApplyServicePage() {
         // ignore
       }
     })()
+
+    return () => controller.abort(ABORT_REASON)
   }, [id])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setSuccess(false)
+    if (alreadyApplied) {
+      setError('You have already applied to this post')
+      return
+    }
 
     if (!id) {
       setError('Missing service id')
@@ -88,12 +152,15 @@ export default function ApplyServicePage() {
 
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(data.error || 'Failed to submit application')
+        const message =
+          res.status === 409 ? 'You have already applied to this post' : data.error || 'Failed to submit application'
+        setError(message)
         setLoading(false)
         return
       }
 
       setSuccess(true)
+      setAlreadyApplied(true)
       setMotivation('')
     } catch (e: any) {
       setError('Server error')
@@ -101,6 +168,8 @@ export default function ApplyServicePage() {
       setLoading(false)
     }
   }
+
+  const isOwner = !!userId && !!service?.poster_id && userId === service.poster_id;
 
   if (authChecked && !userId) {
     return (
@@ -120,7 +189,7 @@ export default function ApplyServicePage() {
           </div>
         </div>
       </main>
-    )
+    );
   }
 
   if (authChecked && userId && !username) {
@@ -141,7 +210,64 @@ export default function ApplyServicePage() {
           </div>
         </div>
       </main>
-    )
+    );
+  }
+
+  if (isOwner) {
+    return (
+      <main className="min-h-screen bg-neutral-50">
+        <div className="max-w-3xl mx-auto px-6 py-12">
+          <div className="bg-white border border-neutral-200 rounded-lg p-8 text-center">
+            <h1 className="text-2xl font-bold mb-2">This is your service</h1>
+            <p className="text-neutral-600 mb-6">
+              You cannot inquire about a service you posted.
+            </p>
+            <Link
+              href={`/post/jobs/service/${id}`}
+              className="inline-flex px-6 py-3 bg-black text-white rounded-lg font-semibold hover:bg-neutral-800 transition"
+            >
+              Back to service
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (authChecked && userId && username && !applicationChecked) {
+    return (
+      <main className="min-h-screen bg-neutral-50">
+        <div className="max-w-3xl mx-auto px-6 py-12">
+          <div className="bg-white border border-neutral-200 rounded-lg p-8 text-center">
+            <h1 className="text-2xl font-bold mb-2">Checking your application</h1>
+            <p className="text-neutral-600 mb-6">
+              Please wait while we verify your application status.
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (authChecked && userId && username && applicationChecked && alreadyApplied && !success) {
+    return (
+      <main className="min-h-screen bg-neutral-50">
+        <div className="max-w-3xl mx-auto px-6 py-12">
+          <div className="bg-white border border-neutral-200 rounded-lg p-8 text-center">
+            <h1 className="text-2xl font-bold mb-2">Already applied</h1>
+            <p className="text-neutral-600 mb-6">
+              You have already applied to this post.
+            </p>
+            <Link
+              href={`/post/jobs/service/${id}`}
+              className="inline-flex px-6 py-3 bg-black text-white rounded-lg font-semibold hover:bg-neutral-800 transition"
+            >
+              Back to service
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -162,7 +288,25 @@ export default function ApplyServicePage() {
             <p className="text-neutral-800 font-medium">{service.title}</p>
             {service.description && <p className="text-neutral-700 mt-2 whitespace-pre-wrap">{service.description}</p>}
             {service.location && <p className="text-neutral-600 mt-2">Location: {service.location}</p>}
-            {service.offer && <p className="text-neutral-900 mt-2 font-semibold">R {Number(service.offer).toLocaleString()}</p>}
+            {service.offer && (
+              <p className="text-neutral-900 mt-2 font-semibold">Rate: R {Number(service.offer).toLocaleString()}</p>
+            )}
+            {serviceImages.length > 0 && (
+              <div className="mt-4">
+                <p className="text-sm font-semibold text-neutral-800 mb-2">Pictures</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {serviceImages.map((src, index) => (
+                    <div key={`${src}-${index}`} className="border border-neutral-200 rounded-lg overflow-hidden bg-white">
+                      <img
+                        src={src}
+                        alt={`Service image ${index + 1}`}
+                        className="h-32 w-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -201,7 +345,7 @@ export default function ApplyServicePage() {
             <button
               type="submit"
               className="flex-1 bg-black text-white py-3 rounded-lg font-semibold hover:bg-neutral-800 disabled:opacity-60 disabled:cursor-not-allowed transition"
-              disabled={loading}
+              disabled={loading || alreadyApplied}
             >
               {loading ? 'Submitting...' : 'Submit Inquiry'}
             </button>

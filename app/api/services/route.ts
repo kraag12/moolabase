@@ -61,8 +61,8 @@ export async function POST(request: NextRequest) {
       work_type: work_type || 'local',
       tools: tools ? String(tools).trim() : null,
       image_url: Array.isArray(image_url) ? image_url.slice(0, 3) : null,
+      duration: 'max',
     }
-
     insertData[ownerColumn] = userId
 
     const { data, error } = await supabase

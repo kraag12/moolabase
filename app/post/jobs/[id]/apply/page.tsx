@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase/client'
+import { resolveColumn } from '@/lib/supabase/schema'
+import { ABORT_REASON } from '@/lib/abort-reason'
 
 export default function ApplyJobPage() {
   const params = useParams()
@@ -15,6 +17,8 @@ export default function ApplyJobPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [alreadyApplied, setAlreadyApplied] = useState(false)
+  const [applicationChecked, setApplicationChecked] = useState(false)
   const [jobDetails, setJobDetails] = useState<any | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
 
@@ -42,12 +46,46 @@ export default function ApplyJobPage() {
     })()
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+
+    if (!id) return
+    if (!userId) {
+      setAlreadyApplied(false)
+      setApplicationChecked(true)
+      return
+    }
+
+    setApplicationChecked(false)
+    ;(async () => {
+      try {
+        const applicantColumn = await resolveColumn(supabase as any, 'job_applications', 'user_id', 'applicant_id')
+        const { data } = await supabase
+          .from('job_applications')
+          .select('id')
+          .eq('job_id', id)
+          .eq(applicantColumn, userId)
+          .limit(1)
+        if (!cancelled) setAlreadyApplied(!!(data && data.length > 0))
+      } catch {
+        if (!cancelled) setAlreadyApplied(false)
+      } finally {
+        if (!cancelled) setApplicationChecked(true)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [id, userId])
+
   // fetch job details for context
   useEffect(() => {
     if (!id) return
+    const controller = new AbortController()
     ;(async () => {
       try {
-        const res = await fetch('/api/listings')
+        const res = await fetch('/api/listings', { cache: 'no-store', signal: controller.signal })
         if (!res.ok) return
         const data = await res.json()
         const items = data?.listings || []
@@ -57,12 +95,18 @@ export default function ApplyJobPage() {
         // ignore
       }
     })()
+
+    return () => controller.abort(ABORT_REASON)
   }, [id])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setSuccess(false)
+    if (alreadyApplied) {
+      setError('You have already applied to this post')
+      return
+    }
 
     if (!id) {
       setError('Missing job id')
@@ -87,12 +131,15 @@ export default function ApplyJobPage() {
       })
       const resp = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setError(resp.error || 'Failed to submit application')
+        const message =
+          res.status === 409 ? 'You have already applied to this post' : resp.error || 'Failed to submit application'
+        setError(message)
         setLoading(false)
         return
       }
 
       setSuccess(true)
+      setAlreadyApplied(true)
       setMotivation('')
     } catch (e) {
       setError('Server error')
@@ -136,6 +183,42 @@ export default function ApplyJobPage() {
               className="inline-flex px-6 py-3 bg-black text-white rounded-lg font-semibold hover:bg-neutral-800 transition"
             >
               Go to profile
+            </Link>
+          </div>
+        </div>
+      </main>
+    )
+  }
+
+  if (authChecked && userId && username && !applicationChecked) {
+    return (
+      <main className="min-h-screen bg-neutral-50">
+        <div className="max-w-3xl mx-auto px-6 py-12">
+          <div className="bg-white border border-neutral-200 rounded-lg p-8 text-center">
+            <h1 className="text-2xl font-bold mb-2">Checking your application</h1>
+            <p className="text-neutral-600 mb-6">
+              Please wait while we verify your application status.
+            </p>
+          </div>
+        </div>
+      </main>
+    )
+  }
+
+  if (authChecked && userId && username && applicationChecked && alreadyApplied && !success) {
+    return (
+      <main className="min-h-screen bg-neutral-50">
+        <div className="max-w-3xl mx-auto px-6 py-12">
+          <div className="bg-white border border-neutral-200 rounded-lg p-8 text-center">
+            <h1 className="text-2xl font-bold mb-2">Already applied</h1>
+            <p className="text-neutral-600 mb-6">
+              You have already applied to this post.
+            </p>
+            <Link
+              href={`/post/jobs/${id}`}
+              className="inline-flex px-6 py-3 bg-black text-white rounded-lg font-semibold hover:bg-neutral-800 transition"
+            >
+              Back to job
             </Link>
           </div>
         </div>
@@ -200,7 +283,7 @@ export default function ApplyJobPage() {
             <button
               type="submit"
               className="flex-1 bg-black text-white py-3 rounded-lg font-semibold hover:bg-neutral-800 disabled:opacity-60 disabled:cursor-not-allowed transition"
-              disabled={loading}
+              disabled={loading || alreadyApplied}
             >
               {loading ? 'Submitting...' : 'Submit Application'}
             </button>

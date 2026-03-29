@@ -1,0 +1,291 @@
+⨯ ./app/api/notifications/route.ts:2:1
+Module not found: Can't resolve '@/lib/supabase/server'
+[0m [90m 1 |[39m [36mimport[39m { [33mNextRequest[39m[33m,[39m [33mNextResponse[39m } [36mfrom[39m [32m'next/server'[39m
+[31m[1m>[22m[39m[90m 2 |[39m [36mimport[39m { createClient } [36mfrom[39m [32m'@/lib/supabase/server'[39m
+ [90m   |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 3 |[39m [36mimport[39m { resolveColumn } [36mfrom[39m [32m'@/lib/supabase/schema'[39m
+ [90m 4 |[39m
+ [90m 5 |[39m type [33mNotificationItem[39m [33m=[39m {[0m
+
+Import map: aliased to relative './lib/supabase/server' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./app/api/listings/route.ts:2:1
+Module not found: Can't resolve '@/lib/supabase/server'
+[0m [90m 1 |[39m [36mimport[39m { [33mNextResponse[39m } [36mfrom[39m [32m'next/server'[39m
+[31m[1m>[22m[39m[90m 2 |[39m [36mimport[39m { createClient } [36mfrom[39m [32m'@/lib/supabase/server'[39m
+ [90m   |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 3 |[39m [36mimport[39m { resolveColumn } [36mfrom[39m [32m'@/lib/supabase/schema'[39m
+ [90m 4 |[39m [36mimport[39m { isListingExpired } [36mfrom[39m [32m'@/lib/listings/expiration'[39m
+ [90m 5 |[39m[0m
+
+Import map: aliased to relative './lib/supabase/server' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./app/api/notifications/route.ts:2:1
+Module not found: Can't resolve '@/lib/supabase/server'
+[0m [90m 1 |[39m [36mimport[39m { [33mNextRequest[39m[33m,[39m [33mNextResponse[39m } [36mfrom[39m [32m'next/server'[39m
+[31m[1m>[22m[39m[90m 2 |[39m [36mimport[39m { createClient } [36mfrom[39m [32m'@/lib/supabase/server'[39m
+ [90m   |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 3 |[39m [36mimport[39m { resolveColumn } [36mfrom[39m [32m'@/lib/supabase/schema'[39m
+ [90m 4 |[39m
+ [90m 5 |[39m type [33mNotificationItem[39m [33m=[39m {[0m
+
+Import map: aliased to relative './lib/supabase/server' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./app/api/listings/route.ts:2:1
+Module not found: Can't resolve '@/lib/supabase/server'
+[0m [90m 1 |[39m [36mimport[39m { [33mNextResponse[39m } [36mfrom[39m [32m'next/server'[39m
+[31m[1m>[22m[39m[90m 2 |[39m [36mimport[39m { createClient } [36mfrom[39m [32m'@/lib/supabase/server'[39m
+ [90m   |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 3 |[39m [36mimport[39m { resolveColumn } [36mfrom[39m [32m'@/lib/supabase/schema'[39m
+ [90m 4 |[39m [36mimport[39m { isListingExpired } [36mfrom[39m [32m'@/lib/listings/expiration'[39m
+ [90m 5 |[39m[0m
+
+Import map: aliased to relative './lib/supabase/server' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+⨯ ./app/api/notifications/route.ts:2:1
+Module not found: Can't resolve '@/lib/supabase/server'
+[0m [90m 1 |[39m [36mimport[39m { [33mNextRequest[39m[33m,[39m [33mNextResponse[39m } [36mfrom[39m [32m'next/server'[39m
+[31m[1m>[22m[39m[90m 2 |[39m [36mimport[39m { createClient } [36mfrom[39m [32m'@/lib/supabase/server'[39m
+ [90m   |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 3 |[39m [36mimport[39m { resolveColumn } [36mfrom[39m [32m'@/lib/supabase/schema'[39m
+ [90m 4 |[39m
+ [90m 5 |[39m type [33mNotificationItem[39m [33m=[39m {[0m
+
+Import map: aliased to relative './lib/supabase/server' inside of [project]/
+
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
+Notifications fetch error: {
+  code: 'PGRST205',
+  details: null,
+  hint: "Perhaps you meant the table 'public.job_applications'",
+  message: "Could not find the table 'public.notifications' in the schema cache"
+}
