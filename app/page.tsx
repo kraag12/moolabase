@@ -9,7 +9,6 @@ import HeaderAuthActions from './components/HeaderAuthActions'
 import { fetchListingsClient } from '@/lib/listings/fetchListingsClient'
 import { getListingHref } from '@/lib/listings/url'
 import { isAbortError } from '@/lib/errors/isAbortError'
-import { ABORT_REASON } from '@/lib/abort-reason'
 
 type Listing = {
   id: string | number
@@ -39,7 +38,6 @@ export default function HomePage() {
   const isMountedRef = useRef(true)
   const fetchInFlightRef = useRef(false)
   const lastBackgroundRefreshRef = useRef(0)
-  const fetchControllerRef = useRef<AbortController | null>(null)
 
   const formatTimeAgo = (dateString: string) => {
     const posted = new Date(dateString)
@@ -64,13 +62,10 @@ export default function HomePage() {
   const fetchListings = useCallback(async (showLoading = true) => {
     if (fetchInFlightRef.current) return
     fetchInFlightRef.current = true
-    fetchControllerRef.current?.abort(ABORT_REASON)
-    const controller = new AbortController()
-    fetchControllerRef.current = controller
 
     try {
       if (showLoading && isMountedRef.current) setLoading(true)
-      const res = await fetch('/api/listings', { cache: 'no-store', signal: controller.signal })
+      const res = await fetch('/api/listings', { cache: 'no-store' })
 
       if (res.status === 304) {
         return
@@ -112,7 +107,13 @@ export default function HomePage() {
             setFilteredListings(fallbackListings.slice(0, 5))
           }
         } catch (fallbackError) {
-          if (!isAbortError(fallbackError)) {
+          const message = String((fallbackError as any)?.message || fallbackError || '').toLowerCase()
+          const isTransientNetworkFailure =
+            message.includes('failed to fetch') ||
+            message.includes('fetch failed') ||
+            message.includes('networkerror') ||
+            message.includes('supabase.co')
+          if (!isAbortError(fallbackError) && !isTransientNetworkFailure) {
             console.error('Listings fallback error:', fallbackError)
           }
         }
@@ -195,7 +196,6 @@ export default function HomePage() {
       cancelled = true
       isMountedRef.current = false
       clearInterval(interval)
-      fetchControllerRef.current?.abort(ABORT_REASON)
       try {
         jobsSubscription?.unsubscribe()
         servicesSubscription?.unsubscribe()

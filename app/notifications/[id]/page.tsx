@@ -59,7 +59,19 @@ export default function NotificationDetailPage() {
 
         const data = await res.json().catch(() => ({}))
         const notifs = Array.isArray(data?.notifications) ? data.notifications : []
-        const found = notifs.find((n: any) => String(n?.id) === id)
+        const normalizedId = id.replace(/^(job|service)-/i, '')
+        const found = notifs.find((n: any) => {
+          const nid = String(n?.id || '')
+          const notifId = String(n?.notif_id || '')
+          const applicationId = String(n?.application_id || '')
+          return (
+            nid === id ||
+            notifId === id ||
+            applicationId === id ||
+            (normalizedId && applicationId === normalizedId) ||
+            (normalizedId && nid === normalizedId)
+          )
+        })
 
         if (cancelled) return
         if (!found) {
@@ -135,8 +147,8 @@ export default function NotificationDetailPage() {
         )
       }
 
-      if (nextStatus === 'accepted' && data.conversation_id) {
-        router.push(`/messages/${data.conversation_id}`)
+      if (nextStatus === 'accepted') {
+        router.push('/notifications?accepted=1')
       } else {
         router.push('/notifications')
       }
@@ -167,88 +179,92 @@ export default function NotificationDetailPage() {
     )
   }
 
-  const isApplication =
+  const isApplicationRequest =
     notification.notification_type === 'job_application' ||
     notification.notification_type === 'service_application' ||
     !!notification.application_id
 
-  if (!isApplication || !notification.listing_type) {
-    return (
-      <main className="min-h-screen bg-neutral-50 flex items-center justify-center p-6">
-        <div className="text-neutral-600">Page not found</div>
-      </main>
-    )
-  }
-
   const applicantLabel = formatApplicantLabel(notification.applicant_name)
   const motivation = String(notification.motivation || '').trim()
   const rawUsername = String(notification.applicant_name || '').trim().replace(/^@/, '')
+  const title = String(notification.title || '').trim()
+  const message = String(notification.message || '').trim()
 
   return (
     <main className="min-h-screen bg-neutral-50 flex items-center justify-center p-6">
       <div className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-neutral-200 bg-neutral-100">
-            {notification.applicant_avatar_url ? (
-              <img
-                src={notification.applicant_avatar_url}
-                alt={applicantLabel}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="h-full w-full flex items-center justify-center text-lg font-bold text-neutral-600">
-                {(rawUsername || 'U').slice(0, 1).toUpperCase()}
+        {isApplicationRequest && notification.listing_type ? (
+          <>
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-neutral-200 bg-neutral-100">
+                {notification.applicant_avatar_url ? (
+                  <img
+                    src={notification.applicant_avatar_url}
+                    alt={applicantLabel}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center text-lg font-bold text-neutral-600">
+                    {(rawUsername || 'U').slice(0, 1).toUpperCase()}
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0">
+                <div className="truncate text-lg font-bold text-neutral-900">{applicantLabel}</div>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+              <p className="text-sm text-neutral-800 whitespace-pre-wrap">
+                {motivation || 'No motivation provided.'}
+              </p>
+            </div>
+
+            {/* only show accept/reject for original application notifications */}
+            {(notification.notification_type === 'job_application' ||
+              notification.notification_type === 'service_application') && (
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleDecision('accepted')}
+                  disabled={processing}
+                  className="rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white hover:bg-neutral-800 disabled:opacity-60"
+                >
+                  Accept
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDecision('rejected')}
+                  disabled={processing}
+                  className="rounded-xl border border-neutral-300 px-4 py-3 text-sm font-semibold text-neutral-900 hover:bg-neutral-50 disabled:opacity-60"
+                >
+                  Reject
+                </button>
               </div>
             )}
-          </div>
-          <div className="min-w-0">
-            <div className="truncate text-lg font-bold text-neutral-900">{applicantLabel}</div>
-          </div>
-        </div>
+          </>
+        ) : (
+          <>
+            <div className="text-lg font-bold text-neutral-900">{title || 'Notification'}</div>
+            {message && (
+              <div className="mt-4 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+                <p className="text-sm text-neutral-800 whitespace-pre-wrap">{message}</p>
+              </div>
+            )}
 
-        <div className="mt-5 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
-          <p className="text-sm text-neutral-800 whitespace-pre-wrap">
-            {motivation || 'No motivation provided.'}
-          </p>
-        </div>
-
-        {/* only show accept/reject for original application notifications */}
-        {(notification.notification_type === 'job_application' ||
-          notification.notification_type === 'service_application') && (
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => handleDecision('accepted')}
-              disabled={processing}
-              className="rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white hover:bg-neutral-800 disabled:opacity-60"
-            >
-              Accept
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDecision('rejected')}
-              disabled={processing}
-              className="rounded-xl border border-neutral-300 px-4 py-3 text-sm font-semibold text-neutral-900 hover:bg-neutral-50 disabled:opacity-60"
-            >
-              Reject
-            </button>
-          </div>
+            {notification.conversation_id && (
+              <div className="mt-5">
+                <button
+                  type="button"
+                  onClick={() => router.push('/messages')}
+                  className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-500"
+                >
+                  Go to messages
+                </button>
+              </div>
+            )}
+          </>
         )}
-
-        {/* if this notification has a conversation link (e.g. acceptance), show chat button */}
-        {notification.conversation_id &&
-          !(notification.notification_type === 'job_application' ||
-            notification.notification_type === 'service_application') && (
-            <div className="mt-5">
-              <button
-                type="button"
-                onClick={() => router.push(`/messages/${notification.conversation_id}`)}
-                className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-500"
-              >
-                Go to chat
-              </button>
-            </div>
-          )}
       </div>
     </main>
   )

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { resolveColumn } from '@/lib/supabase/schema'
 import { insertNotificationRobust } from '@/lib/notifications/insertNotification'
+import { createServiceRoleClient } from '@/lib/supabase/serviceRole'
 
 async function getServiceDetails(supabase: any, serviceId: string) {
   const { data, error } = await supabase
@@ -28,17 +29,6 @@ async function getPosterUsername(supabase: any, posterId: string) {
 
   if (error) throw new Error(error.message)
   return data?.username as string | null
-}
-
-async function getUsername(supabase: any, userId: string) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('username')
-    .eq('id', userId)
-    .maybeSingle()
-
-  if (error) throw new Error(error.message)
-  return (data?.username as string | null) ?? null
 }
 
 async function getOrCreateConversation(supabase: any, ownerId: string, applicantId: string) {
@@ -139,44 +129,29 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         if (!applicantId || !conversationId) return NextResponse.json({ application: updatedApp, conversation_id: null })
 
         let posterUsername: string | null = null
-        let applicantUsername: string | null = null
         try {
           posterUsername = await getPosterUsername(supabase, ownerId)
-          applicantUsername = await getUsername(supabase, applicantId)
         } catch (profileError) {
           console.warn('Username lookup failed during acceptance:', profileError)
         }
         const ownerDisplay = posterUsername ? `@${posterUsername}` : 'the listing owner'
-        const applicantDisplay = applicantUsername ? `@${applicantUsername}` : 'the applicant'
 
-        const applicantNotification = await insertNotificationRobust(supabase as any, {
+        const notificationClient = (createServiceRoleClient() ?? supabase) as any
+        const applicantNotification = await insertNotificationRobust(notificationClient, {
           user_id: applicantId,
           sender_id: ownerId,
           type: 'service_application_accepted',
           reference_id: updatedApp.id,
-          title: `Application accepted for "${serviceTitle}"`,
-          message: `Your application has been accepted. You are now connected to ${ownerDisplay}. Start chatting now.`,
+          title: `Your application was accepted by ${ownerDisplay}`,
+          message: serviceTitle
+            ? `For "${serviceTitle}". Check Messages to start chatting.`
+            : 'Check Messages to start chatting.',
           listing_type: 'service',
           listing_id: currentApp.service_id,
           conversation_id: conversationId,
         })
         if (!applicantNotification.ok) {
           console.warn('Failed to insert service acceptance notification:', applicantNotification.error)
-        }
-
-        const ownerNotification = await insertNotificationRobust(supabase as any, {
-          user_id: ownerId,
-          sender_id: applicantId,
-          type: 'service_application_connected',
-          reference_id: updatedApp.id,
-          title: 'Applicant connected',
-          message: `You are now connected to ${applicantDisplay}. Start chatting now.`,
-          listing_type: 'service',
-          listing_id: currentApp.service_id,
-          conversation_id: conversationId,
-        })
-        if (!ownerNotification.ok) {
-          console.warn('Failed to insert owner connection notification:', ownerNotification.error)
         }
 
         await supabase

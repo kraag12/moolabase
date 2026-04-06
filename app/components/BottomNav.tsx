@@ -33,16 +33,21 @@ export default function BottomNav() {
           return
         }
 
-        const res = await fetch('/api/notifications?summary=1', { cache: 'no-store' })
-        const payload = await res.json().catch(() => ({}))
-        const nextNotificationCount = Number(payload?.count ?? 0)
+        const [notifRes, msgRes] = await Promise.all([
+          fetch('/api/notifications?summary=1', { cache: 'no-store' }),
+          fetch('/api/conversations?summary=1', { cache: 'no-store' }),
+        ])
+
+        const notifPayload = await notifRes.json().catch(() => ({}))
+        const msgPayload = await msgRes.json().catch(() => ({}))
+
+        const nextNotificationCount = Number(notifPayload?.count ?? 0)
+        const nextMessageCount = Number(msgPayload?.count ?? 0)
 
         if (!mounted) return
 
         setNotificationCount(Number.isFinite(nextNotificationCount) ? nextNotificationCount : 0)
-
-        // Unread message counts are not implemented yet (no read-tracking in schema).
-        setMessageCount(0)
+        setMessageCount(Number.isFinite(nextMessageCount) ? nextMessageCount : 0)
       } catch (error) {
         if (!mounted || isAbortError(error)) return
         setNotificationCount(0)
@@ -117,7 +122,7 @@ export default function BottomNav() {
               <MessageCircle size={24} />
               {messageCount > 0 && (
                 <span className="absolute -top-1 -right-2 h-4 min-w-4 rounded-full bg-red-600 text-white text-[10px] font-semibold flex items-center justify-center px-1">
-                  {messageCount > 99 ? '99+' : messageCount}
+                  {messageCount > 9 ? '9+' : messageCount}
                 </span>
               )}
             </div>
@@ -137,7 +142,7 @@ export default function BottomNav() {
               <Bell size={24} />
               {notificationCount > 0 && (
                 <span className="absolute -top-1 -right-2 h-4 min-w-4 rounded-full bg-red-600 text-white text-[10px] font-semibold flex items-center justify-center px-1">
-                  {notificationCount > 99 ? '99+' : notificationCount}
+                  {notificationCount > 9 ? '9+' : notificationCount}
                 </span>
               )}
             </div>

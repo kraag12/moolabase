@@ -255,11 +255,11 @@ export async function GET(request: NextRequest) {
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, limit)
 
-      const pendingCount = notifications.filter((n) => n.action_required || !n.read).length
+      const unreadCount = notifications.filter((n) => !n.read).length
       if (summaryOnly) {
-        return NextResponse.json({ count: pendingCount })
+        return NextResponse.json({ count: unreadCount })
       }
-      return NextResponse.json({ notifications, count: pendingCount })
+      return NextResponse.json({ notifications, count: unreadCount })
     }
 
     // first, try to satisfy everything straight from the notification row
@@ -307,12 +307,12 @@ export async function GET(request: NextRequest) {
           })) as any
         )
         // jump straight to count/response
-        const pendingCount = notifications.filter((n) => n.action_required || !n.read).length
+        const unreadCount = notifications.filter((n) => !n.read).length
         console.log('Returning notifications:', notifications.map(n => ({ id: n.id, applicant_name: n.applicant_name, motivation: n.motivation, action_required: n.action_required })))
         if (summaryOnly) {
-          return NextResponse.json({ count: pendingCount })
+          return NextResponse.json({ count: unreadCount })
         }
-        return NextResponse.json({ notifications: notifications, count: pendingCount })
+        return NextResponse.json({ notifications: notifications, count: unreadCount })
       }
     }
 
@@ -546,15 +546,15 @@ export async function GET(request: NextRequest) {
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     )
 
-    const pendingCount = all.filter((n) => n.action_required || !n.read).length
+    const unreadCount = all.filter((n) => !n.read).length
 
     console.log('Returning notifications:', all.map(n => ({ id: n.id, applicant_name: n.applicant_name, motivation: n.motivation, action_required: n.action_required })))
 
     if (summaryOnly) {
-      return NextResponse.json({ count: pendingCount })
+      return NextResponse.json({ count: unreadCount })
     }
 
-    return NextResponse.json({ notifications: all, count: pendingCount })
+    return NextResponse.json({ notifications: all, count: unreadCount })
   } catch (error: any) {
     console.error('Notifications API error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })

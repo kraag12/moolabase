@@ -106,7 +106,13 @@ export default function JobsPage() {
             if (resetPage) setCurrentPage(1)
           }
         } catch (fallbackError) {
-          if (!isAbortError(fallbackError)) {
+          const message = String((fallbackError as any)?.message || fallbackError || '').toLowerCase()
+          const isTransientNetworkFailure =
+            message.includes('failed to fetch') ||
+            message.includes('fetch failed') ||
+            message.includes('networkerror') ||
+            message.includes('supabase.co')
+          if (!isAbortError(fallbackError) && !isTransientNetworkFailure) {
             console.error('Listings fallback error:', fallbackError)
           }
         }
