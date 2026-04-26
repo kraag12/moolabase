@@ -1,3 +1,5 @@
-'use client'
+import { redirect } from 'next/navigation'
 
-export { default } from '../jobs/service/page'
+export default function PostServicesAliasPage() {
+  redirect('/post/jobs/service')
+}

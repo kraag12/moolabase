@@ -47,9 +47,9 @@ export default function HeaderAuthActions() {
 
     ;(async () => {
       try {
-        const { data } = await supabase.auth.getUser()
+        const { data } = await supabase.auth.getSession()
         if (!mounted) return
-        await hydrateUserState(data.user ?? null)
+        await hydrateUserState(data.session?.user ?? null)
       } catch (error) {
         if (!mounted || isAbortError(error)) return
         setIsAuthenticated(false)

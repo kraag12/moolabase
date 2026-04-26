@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Search, MapPin, RefreshCw, AlertTriangle } from 'lucide-react'
+import { Search, MapPin, RefreshCw, AlertTriangle, Zap } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import HeaderAuthActions from './components/HeaderAuthActions'
 import { fetchListingsClient } from '@/lib/listings/fetchListingsClient'
@@ -20,6 +20,8 @@ type Listing = {
   type: 'job' | 'service'
   created_at: string
   response_time?: string
+  boosted?: boolean
+  boost_expires_at?: string | null
 }
 
 type ListingsApiErrorDetails = {
@@ -38,6 +40,32 @@ export default function HomePage() {
   const isMountedRef = useRef(true)
   const fetchInFlightRef = useRef(false)
   const lastBackgroundRefreshRef = useRef(0)
+
+  const interleaveBoosted = (items: Listing[], interval = 4) => {
+    const boosted = items.filter((item) => item.boosted)
+    const regular = items.filter((item) => !item.boosted)
+    const result: Listing[] = []
+    let r = 0
+    let b = 0
+    while (r < regular.length || b < boosted.length) {
+      for (let i = 0; i < interval && r < regular.length; i += 1) {
+        result.push(regular[r])
+        r += 1
+      }
+      if (b < boosted.length) {
+        result.push(boosted[b])
+        b += 1
+      }
+      if (r >= regular.length && b < boosted.length && interval === 0) {
+        break
+      }
+      if (r >= regular.length && interval > 0 && b < boosted.length && regular.length === 0) {
+        // Only boosted items exist
+        continue
+      }
+    }
+    return result
+  }
 
   const formatTimeAgo = (dateString: string) => {
     const posted = new Date(dateString)
@@ -213,6 +241,8 @@ export default function HomePage() {
     setFilteredListings(filtered)
   }, [searchQuery, listings])
 
+  const displayedListings = interleaveBoosted(filteredListings, 4)
+
   const handleRefresh = async () => {
     setRefreshing(true)
     await fetchListings(false)
@@ -298,7 +328,7 @@ export default function HomePage() {
         )}
 
         <div className="flex flex-col gap-4">
-          {filteredListings.map((listing) => {
+          {displayedListings.map((listing) => {
             // ensure we have an id and type before linking
             if (!listing.id) return null
             const idStr = String(listing.id).trim()
@@ -331,6 +361,12 @@ export default function HomePage() {
                             <div className="flex items-center gap-1 text-red-600 bg-red-100 border border-red-200 px-2 py-0.5 rounded-full">
                               <AlertTriangle size={12} />
                               <span className="text-xs font-semibold">URGENT</span>
+                            </div>
+                          )}
+                          {listing.boosted && (
+                            <div className="flex items-center gap-1 text-amber-700 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-full">
+                              <Zap size={12} />
+                              <span className="text-xs font-semibold">BOOSTED</span>
                             </div>
                           )}
                         </div>

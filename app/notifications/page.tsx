@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ABORT_REASON } from '@/lib/abort-reason'
 
 type Notification = {
   id: string
@@ -79,14 +78,11 @@ export default function NotificationsPage() {
   }, [acceptedBanner])
 
   useEffect(() => {
-    const controller = new AbortController()
-
     const loadNotifications = async () => {
       setLoading(true)
       try {
         const res = await fetch('/api/notifications', {
           cache: 'no-store',
-          signal: controller.signal,
         })
 
         if (!res.ok) {
@@ -102,15 +98,11 @@ export default function NotificationsPage() {
           setNotifications([])
         }
       } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false)
-        }
+        setLoading(false)
       }
     }
 
     loadNotifications()
-
-    return () => controller.abort(ABORT_REASON)
   }, [])
 
   return (

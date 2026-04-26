@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { ABORT_REASON } from '@/lib/abort-reason'
 import Link from 'next/link'
 
 type Application = {
@@ -30,10 +29,9 @@ export default function JobApplicationsPage() {
   useEffect(() => {
     if (!id) return
     setLoading(true)
-    const controller = new AbortController()
     ;(async () => {
       try {
-        const res = await fetch(`/api/job_applications?job_id=${id}`, { signal: controller.signal })
+        const res = await fetch(`/api/job_applications?job_id=${id}`)
         if (!res.ok) return
         const data = await res.json()
         setApplications(data.applications || [])
@@ -43,8 +41,6 @@ export default function JobApplicationsPage() {
         setLoading(false)
       }
     })()
-
-    return () => controller.abort(ABORT_REASON)
   }, [id])
 
   useEffect(() => {
@@ -56,14 +52,12 @@ export default function JobApplicationsPage() {
   }, [selectedApplicationId, applications.length])
 
   async function updateStatus(appId: string, status: string) {
-    const controller = new AbortController()
     try {
       setUpdatingId(appId)
       const res = await fetch(`/api/job_applications/${appId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
-        signal: controller.signal,
       })
       if (!res.ok) return
       const data = await res.json()

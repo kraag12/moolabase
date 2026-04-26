@@ -22,8 +22,8 @@ export default function BottomNav() {
 
     const fetchCounts = async () => {
       try {
-        const { data } = await supabase.auth.getUser()
-        const userId = data?.user?.id ?? null
+        const { data } = await supabase.auth.getSession()
+        const userId = data?.session?.user?.id ?? null
 
         if (!mounted) return
 

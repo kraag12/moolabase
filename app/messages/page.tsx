@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, MessageCircle, BadgeCheck, Search } from 'lucide-react'
 import { isAbortError } from '@/lib/errors/isAbortError'
-import { ABORT_REASON } from '@/lib/abort-reason'
 import { supabase } from '@/lib/supabase/client'
 
 interface Conversation {
@@ -54,7 +53,6 @@ export default function MessagesPage() {
 
   useEffect(() => {
     let cancelled = false
-    const controller = new AbortController()
     let interval: ReturnType<typeof setInterval> | null = null
 
     const load = async (options?: { showLoading?: boolean }) => {
@@ -63,7 +61,7 @@ export default function MessagesPage() {
         if (!cancelled && showLoading) setLoading(true)
         if (!cancelled) setError('')
 
-        const response = await fetch('/api/conversations', { cache: 'no-store', signal: controller.signal })
+        const response = await fetch('/api/conversations', { cache: 'no-store' })
         const payload = await response.json().catch(() => ({}))
 
         if (!response.ok) {
@@ -89,7 +87,6 @@ export default function MessagesPage() {
     return () => {
       cancelled = true
       if (interval) clearInterval(interval)
-      controller.abort(ABORT_REASON)
     }
   }, [clientUserId])
 

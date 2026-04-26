@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { BOOST_PLANS } from '@/lib/boosts/plans'
 
 export default function PostJobPage() {
   const router = useRouter()
@@ -16,12 +17,15 @@ export default function PostJobPage() {
   const [duration, setDuration] = useState('1_week')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [boostError, setBoostError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [redirecting, setRedirecting] = useState(false)
+  const [boostPlan, setBoostPlan] = useState<string>('')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    setBoostError(null)
     setSuccess(false)
     setRedirecting(false)
 
@@ -44,7 +48,6 @@ export default function PostJobPage() {
     }
 
     setLoading(true)
-    const controller = new AbortController()
 
     try {
       const response = await fetch('/api/jobs', {
@@ -59,7 +62,6 @@ export default function PostJobPage() {
             response_time: responseTime,
             duration,
           }),
-        signal: controller.signal,
       })
 
       if (!response.ok) {
@@ -70,6 +72,46 @@ export default function PostJobPage() {
       }
 
       const data = await response.json()
+
+      if (boostPlan) {
+        const boostRes = await fetch('/api/boosts/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            listing_type: 'job',
+            listing_id: data?.id,
+            plan: boostPlan,
+          }),
+        })
+
+        if (!boostRes.ok) {
+          const boostData = await boostRes.json().catch(() => ({}))
+          if (boostData?.code === 'payments_not_configured') {
+            setBoostError('Job posted. Boost payments are not configured yet.')
+            setSuccess(true)
+            setRedirecting(true)
+            setLoading(false)
+            setTimeout(() => {
+              router.push('/jobs')
+            }, 900)
+            return
+          }
+          setBoostError(boostData?.error || 'Failed to boost job')
+          setLoading(false)
+          return
+        }
+
+        const boostData = await boostRes.json().catch(() => ({}))
+        const checkoutUrl = String(boostData?.checkout_url || '').trim()
+        if (!checkoutUrl) {
+          setBoostError('Payment checkout URL missing')
+          setLoading(false)
+          return
+        }
+        setLoading(false)
+        window.location.href = checkoutUrl
+        return
+      }
       setSuccess(true)
       setRedirecting(true)
       setLoading(false)
@@ -173,7 +215,43 @@ export default function PostJobPage() {
             </div>
           </div>
 
+          <div className="border-t border-neutral-200 pt-6">
+            <div className="mb-3">
+              <h3 className="text-lg font-semibold text-neutral-900">Boost this post (optional)</h3>
+              <p className="text-sm text-neutral-600">Boosted posts appear in intervals and get extra visibility.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {BOOST_PLANS.map((plan) => (
+                <button
+                  key={plan.id}
+                  type="button"
+                  onClick={() => setBoostPlan(plan.id)}
+                  className={`rounded-xl border px-4 py-3 text-left transition ${
+                    boostPlan === plan.id
+                      ? 'border-black bg-black text-white'
+                      : 'border-neutral-200 bg-white text-neutral-900 hover:border-neutral-300'
+                  }`}
+                >
+                  <div className="text-sm font-semibold">{plan.label}</div>
+                  <div className={`text-xs ${boostPlan === plan.id ? 'text-neutral-200' : 'text-neutral-500'}`}>
+                    R {Math.round(plan.priceCents / 100)}
+                  </div>
+                </button>
+              ))}
+            </div>
+            {boostPlan && (
+              <button
+                type="button"
+                onClick={() => setBoostPlan('')}
+                className="mt-3 text-sm text-neutral-600 hover:text-neutral-900"
+              >
+                Remove boost
+              </button>
+            )}
+          </div>
+
           {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">{error}</div>}
+          {boostError && <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg">{boostError}</div>}
           {success && (
             <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center justify-between gap-4">
               <span>Job posted successfully!</span>

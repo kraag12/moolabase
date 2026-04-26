@@ -6,7 +6,6 @@ import Link from 'next/link'
 import { ArrowLeft, Send, BadgeCheck, Image as ImageIcon, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { isAbortError } from '@/lib/errors/isAbortError'
-import { ABORT_REASON } from '@/lib/abort-reason'
 
 interface Conversation {
   id: string;
@@ -74,14 +73,12 @@ export default function MessageThreadPage() {
     if (!conversationId) return;
     let cancelled = false;
     let interval: NodeJS.Timeout | null = null;
-    const fetchController = new AbortController();
 
     // Wrap these functions to respect `cancelled` flag and abort signal
     const fetchConversationDetails = async () => {
       try {
         const response = await fetch(`/api/conversations?id=${encodeURIComponent(conversationId)}`, {
           cache: 'no-store',
-          signal: fetchController.signal,
         })
         const payload = await response.json().catch(() => ({}))
         if (!response.ok) throw new Error(payload?.error || 'Failed to fetch conversation')
@@ -107,7 +104,6 @@ export default function MessageThreadPage() {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ conversation_id: conversationId }),
-          signal: fetchController.signal,
         })
       } catch (err) {
         if (cancelled || isAbortError(err)) return
@@ -118,7 +114,6 @@ export default function MessageThreadPage() {
       try {
         const response = await fetch(`/api/messages?conversation_id=${conversationId}`, {
           cache: 'no-store',
-          signal: fetchController.signal,
         });
         if (!response.ok) throw new Error('Failed to fetch messages');
         const data = await response.json();
@@ -156,7 +151,6 @@ export default function MessageThreadPage() {
     return () => {
       cancelled = true;
       if (interval) clearInterval(interval);
-      fetchController.abort(ABORT_REASON);
     };
   }, [conversationId]);
 

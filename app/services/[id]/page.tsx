@@ -183,13 +183,11 @@ export default function ServiceIdPage() {
     }
 
     setSubmitting(true)
-    const controller = new AbortController()
     try {
       const res = await fetch('/api/service_applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ service_id: id, motivation: motivation.trim() }),
-        signal: controller.signal,
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {

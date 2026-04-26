@@ -2,13 +2,12 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { Search, RefreshCw, MapPin, AlertTriangle } from 'lucide-react'
+import { Search, RefreshCw, MapPin, AlertTriangle, Zap } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import HeaderAuthActions from '@/app/components/HeaderAuthActions'
 import { fetchListingsClient } from '@/lib/listings/fetchListingsClient'
 import { isAbortError } from '@/lib/errors/isAbortError'
 import { getListingHref } from '@/lib/listings/url'
-import { ABORT_REASON } from '@/lib/abort-reason'
 
 type Listing = {
   id: string | number
@@ -20,6 +19,8 @@ type Listing = {
   type: 'job' | 'service'
   created_at: string
   response_time?: string | null
+  boosted?: boolean
+  boost_expires_at?: string | null
 }
 
 const ITEMS_PER_PAGE = 10
@@ -34,7 +35,25 @@ export default function JobsPage() {
   const isMountedRef = useRef(true)
   const fetchInFlightRef = useRef(false)
   const lastBackgroundRefreshRef = useRef(0)
-  const fetchControllerRef = useRef<AbortController | null>(null)
+
+  const interleaveBoosted = (items: Listing[], interval = 4) => {
+    const boosted = items.filter((item) => item.boosted)
+    const regular = items.filter((item) => !item.boosted)
+    const result: Listing[] = []
+    let r = 0
+    let b = 0
+    while (r < regular.length || b < boosted.length) {
+      for (let i = 0; i < interval && r < regular.length; i += 1) {
+        result.push(regular[r])
+        r += 1
+      }
+      if (b < boosted.length) {
+        result.push(boosted[b])
+        b += 1
+      }
+    }
+    return result
+  }
 
   const formatTimeAgo = (dateString: string) => {
     const posted = new Date(dateString)
@@ -58,9 +77,7 @@ export default function JobsPage() {
 
   // Fetch all listings
   const fetchListings = useCallback(async (options?: { resetPage?: boolean; showLoading?: boolean }) => {
-    fetchControllerRef.current?.abort(ABORT_REASON)
-    const controller = new AbortController()
-    fetchControllerRef.current = controller
+    if (fetchInFlightRef.current) return
     fetchInFlightRef.current = true
 
     const resetPage = options?.resetPage ?? true
@@ -73,7 +90,6 @@ export default function JobsPage() {
 
       const res = await fetch('/api/listings', {
         cache: 'no-store',
-        signal: controller.signal,
       })
 
       if (res.status === 304) {
@@ -197,7 +213,6 @@ export default function JobsPage() {
       cancelled = true
       isMountedRef.current = false
       clearInterval(interval)
-      fetchControllerRef.current?.abort(ABORT_REASON)
       try {
         jobsSubscription?.unsubscribe()
         servicesSubscription?.unsubscribe()
@@ -224,10 +239,11 @@ export default function JobsPage() {
   }, [searchQuery, allListings])
 
   // Calculate pagination
-  const totalPages = Math.ceil(filteredListings.length / ITEMS_PER_PAGE)
+  const interleavedListings = interleaveBoosted(filteredListings, 4)
+  const totalPages = Math.ceil(interleavedListings.length / ITEMS_PER_PAGE)
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
   const endIndex = startIndex + ITEMS_PER_PAGE
-  const paginatedListings = filteredListings.slice(startIndex, endIndex)
+  const paginatedListings = interleavedListings.slice(startIndex, endIndex)
 
   const handlePrevious = () => {
     if (currentPage > 1) {
@@ -339,6 +355,12 @@ export default function JobsPage() {
                                 <div className="flex items-center gap-1 text-red-600 bg-red-100 border border-red-200 px-2 py-0.5 rounded-full">
                                   <AlertTriangle size={12} />
                                   <span className="text-xs font-semibold">URGENT</span>
+                                </div>
+                              )}
+                              {listing.boosted && (
+                                <div className="flex items-center gap-1 text-amber-700 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-full">
+                                  <Zap size={12} />
+                                  <span className="text-xs font-semibold">BOOSTED</span>
                                 </div>
                               )}
                             </div>

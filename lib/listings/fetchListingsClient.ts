@@ -104,7 +104,41 @@ export async function fetchListingsClient(supabase: any) {
     }
   }
 
+  const nowIso = new Date().toISOString()
+  const boostMap = new Map<string, { ends_at?: string | null; starts_at?: string | null }>()
+  try {
+    const { data: boosts, error: boostsError } = await supabase
+      .from('boosts')
+      .select('listing_type, listing_id, starts_at, ends_at')
+      .lte('starts_at', nowIso)
+      .gt('ends_at', nowIso)
+
+    if (!boostsError && boosts) {
+      boosts.forEach((row: any) => {
+        const key = `${row.listing_type}:${String(row.listing_id)}`
+        boostMap.set(key, { ends_at: row.ends_at ?? null, starts_at: row.starts_at ?? null })
+      })
+    }
+  } catch (error) {
+    if (!isAbortError(error)) {
+      // Missing boosts table or permissions - ignore silently
+    }
+  }
+
   return [...normalizedJobs, ...normalizedServices]
     .filter((item: any) => item && item.id)
+    .map((item: any) => {
+      const key = `${item.type}:${String(item.id)}`
+      const boost = boostMap.get(key)
+      if (boost) {
+        return {
+          ...item,
+          boosted: true,
+          boost_starts_at: boost.starts_at ?? null,
+          boost_expires_at: boost.ends_at ?? null,
+        }
+      }
+      return item
+    })
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 }

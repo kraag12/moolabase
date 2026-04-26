@@ -53,6 +53,8 @@ export default function ListingPage() {
   const searchParams = useSearchParams()
   const id = (searchParams.get('id') || '').trim()
   const type = (searchParams.get('type') || '').trim() as ListingType | ''
+  const boostPaymentId = (searchParams.get('boost_payment') || '').trim()
+  const boostStatus = (searchParams.get('boost_status') || '').trim().toLowerCase()
 
   const [listing, setListing] = useState<Listing | null>(null)
   const [loading, setLoading] = useState(true)
@@ -66,6 +68,7 @@ export default function ListingPage() {
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [boostNotice, setBoostNotice] = useState<string | null>(null)
 
   const images = useMemo(() => normalizeImages(listing?.image_url).slice(0, 3), [listing?.image_url])
   const ownerId = listing?.poster_id || listing?.user_id || null
@@ -164,6 +167,42 @@ export default function ListingPage() {
   }, [id, type])
 
   useEffect(() => {
+    if (!boostPaymentId) return
+
+    if (boostStatus === 'cancelled') {
+      setBoostNotice('Boost checkout was cancelled.')
+      return
+    }
+    if (boostStatus !== 'success') return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const response = await fetch('/api/boosts/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ payment_id: boostPaymentId }),
+        })
+        const data = await response.json().catch(() => ({}))
+        if (cancelled) return
+
+        if (response.ok) {
+          setBoostNotice('Boost activated successfully.')
+          return
+        }
+
+        setBoostNotice(data?.error || 'Payment received. Boost activation is pending.')
+      } catch {
+        if (!cancelled) setBoostNotice('Payment received. Boost activation is pending.')
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [boostPaymentId, boostStatus])
+
+  useEffect(() => {
     ;(async () => {
       try {
         const { data } = await supabase.auth.getUser()
@@ -257,6 +296,12 @@ export default function ListingPage() {
         <Link href="/jobs" className="inline-block text-neutral-600 hover:text-neutral-900 mb-8 text-sm">
           Back to listings
         </Link>
+
+        {boostNotice && (
+          <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            {boostNotice}
+          </div>
+        )}
 
         <div className="bg-white border border-neutral-200 rounded-2xl overflow-hidden shadow-sm">
           <div className="p-8 space-y-8">

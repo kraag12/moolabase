@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ABORT_REASON } from '@/lib/abort-reason'
 
 type Notification = {
   id: string
@@ -43,13 +42,11 @@ export default function NotificationDetailPage() {
 
   useEffect(() => {
     let cancelled = false
-    const controller = new AbortController()
 
     const run = async () => {
       try {
         const res = await fetch('/api/notifications', {
           cache: 'no-store',
-          signal: controller.signal,
         })
 
         if (!res.ok) {
@@ -86,7 +83,6 @@ export default function NotificationDetailPage() {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: found.notif_id, read: true }),
-            signal: controller.signal,
           }).catch(() => {})
         }
       } catch {
@@ -102,7 +98,6 @@ export default function NotificationDetailPage() {
     return () => {
       cancelled = true
       mountedRef.current = false
-      controller.abort(ABORT_REASON)
     }
   }, [id])
 
@@ -114,7 +109,6 @@ export default function NotificationDetailPage() {
     if (!applicationId) return
 
     setProcessing(true)
-    const controller = new AbortController()
 
     try {
       const endpoint =
@@ -126,7 +120,6 @@ export default function NotificationDetailPage() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: nextStatus }),
-        signal: controller.signal,
       })
 
       if (!res.ok) return

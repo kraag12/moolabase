@@ -5,7 +5,6 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase/client'
 import { resolveColumn } from '@/lib/supabase/schema'
-import { ABORT_REASON } from '@/lib/abort-reason'
 
 export default function ApplyServicePage() {
   const params = useParams()
@@ -102,10 +101,9 @@ export default function ApplyServicePage() {
   // fetch service details from merged listings endpoint
   useEffect(() => {
     if (!id) return
-    const controller = new AbortController()
     ;(async () => {
       try {
-        const res = await fetch('/api/listings', { cache: 'no-store', signal: controller.signal })
+        const res = await fetch('/api/listings', { cache: 'no-store' })
         if (!res.ok) return
         const data = await res.json()
         const items = data?.listings || []
@@ -115,8 +113,6 @@ export default function ApplyServicePage() {
         // ignore
       }
     })()
-
-    return () => controller.abort(ABORT_REASON)
   }, [id])
 
   async function handleSubmit(e: React.FormEvent) {
