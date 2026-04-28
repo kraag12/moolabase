@@ -139,7 +139,15 @@ export default function SignUpPage() {
       })
 
       if (signUpError) {
-        setError(signUpError.message)
+        const rawMessage = String(signUpError.message || '')
+        const normalized = rawMessage.toLowerCase()
+        if (normalized.includes('database error saving new user')) {
+          setError(
+            'Signup is blocked by a Supabase database trigger error. Run the latest auth SQL hotfix migrations (022 and 023), then try again.'
+          )
+        } else {
+          setError(rawMessage)
+        }
         return
       }
 

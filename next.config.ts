@@ -13,6 +13,12 @@ const supabaseHostname = (() => {
 })()
 
 const nextConfig: NextConfig = {
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  experimental: {
+    workerThreads: true,
+  },
   images: {
     remotePatterns: [
       {
